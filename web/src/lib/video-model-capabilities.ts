@@ -10,6 +10,11 @@ export function isAgnesVideoV25Model(modelName: string) {
     return modelKey(modelName) === "agnes-video-2-5";
 }
 
+export function isWan3VideoModel(modelName: string) {
+    const model = modelKey(modelName);
+    return model === "wan3-0-video" || model === "wan3-0-video-prime";
+}
+
 export const COGVIDEOX3_DURATIONS = ["5", "10"] as const;
 
 export function normalizeCogVideoX3Duration(value: string) {
@@ -41,6 +46,7 @@ export function supportsVideoFrameReferences(modelName: string, protocol = "") {
         (model.includes("seedance-1-0") || model.includes("seedance1-0")) ||
         model === "happyhorse-1-1" ||
         (protocol === "tokendance" && model === "happyhorse-1-1-i2v") ||
+        (protocol === "apimart" && isWan3VideoModel(model)) ||
         (protocol === "tokendance" && [
             "happyhorse-1-0-i2v", "minimax-h3-max",
             "wan3-0-video", "wan3-0-video-prime",
