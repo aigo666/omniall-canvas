@@ -412,32 +412,7 @@ async function createVideoRequestBody(config: AiConfig, model: string, prompt: s
             ...(lastFrame ? { last_frame_url: lastFrame } : {}),
         };
     }
-    if (videoChannelProtocol(config, model) === "tokendance") {
-        const { autoDLReferenceURL } = await import("./direct-ai");
-        const referenceURL = (reference: ReferenceImage | ReferenceVideo | ReferenceAudio) => autoDLReferenceURL(reference, "TokenDance");
-        const [images, videos, audios, firstFrame, lastFrame] = await Promise.all([
-            Promise.all(input.references.map(referenceURL)),
-            Promise.all(input.videoReferences.map(referenceURL)),
-            Promise.all(input.audioReferences.map(referenceURL)),
-            input.firstFrame ? referenceURL(input.firstFrame) : Promise.resolve(""),
-            input.lastFrame ? referenceURL(input.lastFrame) : Promise.resolve(""),
-        ]);
-        return {
-            model,
-            prompt,
-            seconds: normalizeVideoSecondsForModel(model, config.videoSeconds),
-            size: normalizeSeedanceRatio(config.size),
-            resolution_name: normalizeVideoResolution(config.vquality),
-            video_generate_audio: boolConfig(config.videoGenerateAudio, false),
-            video_watermark: boolConfig(config.videoWatermark, false),
-            character_orientation: normalizeCharacterOrientation(config.videoCharacterOrientation),
-            ...(images.length ? { "input_reference[]": images } : {}),
-            ...(videos.length ? { "video_reference[]": videos } : {}),
-            ...(audios.length ? { "audio_reference[]": audios } : {}),
-            ...(firstFrame ? { first_frame_url: firstFrame } : {}),
-            ...(lastFrame ? { last_frame_url: lastFrame } : {}),
-        };
-    }
+    const tokenDance = videoChannelProtocol(config, model) === "tokendance";
     if (videoChannelProtocol(config, model) === "ark") return createArkSeedanceVideoRequestBody(config, model, prompt, input);
     const size = normalizeVideoSize(config.size);
     if (isGeminiVideoModel(model) && isGeminiConfig(config, model)) return createGeminiVeoRequestBody(config, model, prompt, input);
@@ -509,14 +484,15 @@ async function createVideoRequestBody(config: AiConfig, model: string, prompt: s
                     : normalizeVideoSecondsForModel(model, config.videoSeconds);
             body.append("seconds", seconds);
         }
-        if (isSeedanceVideoConfig(config)) body.append("size", normalizeSeedanceRatio(config.size));
+        if (tokenDance || isSeedanceVideoConfig(config)) body.append("size", normalizeSeedanceRatio(config.size));
         else if (size) body.append("size", size);
         body.append("resolution_name", normalizeVideoResolution(config.vquality));
         if (isKIEGrokVideoModel(config, model)) body.append("mode", normalizeGrokVideoMode(config.videoMode));
         else body.append("preset", "normal");
     }
-    if (motionControl) body.append("character_orientation", normalizeCharacterOrientation(config.videoCharacterOrientation));
-    if (apimartWan3 || supportsVideoAudioGeneration(model)) body.append("video_generate_audio", String(boolConfig(config.videoGenerateAudio, false)));
+    if (tokenDance || motionControl) body.append("character_orientation", normalizeCharacterOrientation(config.videoCharacterOrientation));
+    if (tokenDance || apimartWan3 || supportsVideoAudioGeneration(model)) body.append("video_generate_audio", String(boolConfig(config.videoGenerateAudio, false)));
+    if (tokenDance) body.append("video_watermark", String(boolConfig(config.videoWatermark, false)));
     const imageReferenceLimit = kieKlingOmni === "text-to-video" ? 0 : kieKlingOmni === "reference-to-video" ? input.references.length : kieKlingOmni === "transformation" ? 4 : kling ? 2 : 10;
     const files = await Promise.all(input.references.slice(0, imageReferenceLimit).map(imageReferenceToFormValue));
     files.forEach((file) => body.append("input_reference[]", file));

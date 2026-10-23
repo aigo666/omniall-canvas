@@ -81,6 +81,7 @@ export type AiConfig = {
     videoSize: string;
     count: string;
     canvasImageCount: string;
+    nodeRegenerateBehavior: "new-node" | "overwrite";
     timeout: string;
     apiMode: string;
     streamImages: string;
@@ -155,6 +156,7 @@ export const defaultConfig: AiConfig = {
     videoSize: "1280x720",
     count: "1",
     canvasImageCount: "1",
+    nodeRegenerateBehavior: "new-node",
     timeout: "600",
     apiMode: "images",
     streamImages: "",
