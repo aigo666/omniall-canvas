@@ -653,10 +653,11 @@ export function AppConfigModal() {
                             </Radio>
                         </Radio.Group>
                     </Form.Item>
-                    <div className="mb-4 grid gap-3 md:grid-cols-3">
+                    <div className="mb-4 grid gap-3 md:grid-cols-4">
                         <FeatureSwitch title={t("流式传输")} description={t("开启后请求中追加 stream，支持读取中间图片事件并避免长时间无数据。")} checked={Boolean(config.streamImages)} onChange={(checked) => updateConfig("streamImages", checked ? "1" : "")} />
                         <FeatureSwitch title={t("返回 Base64 图片数据")} description={t("开启后 Image API 请求会追加 response_format: b64_json。")} checked={Boolean(config.responseFormatB64Json)} onChange={(checked) => updateConfig("responseFormatB64Json", checked ? "1" : "")} />
                         <FeatureSwitch title={t("Codex CLI 兼容模式")} description={t("开启后减少不兼容参数，并追加防提示词改写前缀。")} checked={Boolean(config.codexCli)} onChange={(checked) => updateConfig("codexCli", checked ? "1" : "")} />
+                        <FeatureSwitch title={t("视频音频生成")} description={t("视频默认生成同步音频。")} checked={config.videoGenerateAudio === "true"} onChange={(checked) => updateConfig("videoGenerateAudio", String(checked))} />
                     </div>
                     {canUseUserStorageProvider ? (
                         <>
