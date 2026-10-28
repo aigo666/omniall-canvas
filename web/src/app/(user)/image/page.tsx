@@ -27,8 +27,8 @@ import {
     Trash2,
     Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { App, Button, Checkbox, Dropdown, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
+import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { App, Button, Checkbox, Drawer, Dropdown, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
 import { CanvasImageSettingsPopover } from "@/app/(user)/canvas/components/canvas-image-settings-popover";
 import { CanvasPromptPopover } from "@/app/(user)/canvas/components/canvas-prompt-popover";
 import localforage from "localforage";
@@ -55,7 +55,7 @@ import { ImageRequestError, batchCanvasImageTaskStatus, createCanvasImageTask, d
 import { comfyOutputStorageKey, getWorkflowTask, isRetryableWorkflowError, submitWorkflowTask } from "@/services/api/workflow-generation";
 import { parseWorkflowRef, type WorkflowRef } from "@/lib/workflow-channel";
 import { deleteImageGenerationLogs, fetchImageGenerationLogs, saveImageGenerationLogs } from "@/services/api/generation-logs";
-import { deleteStoredImages, imageToDataUrl, resolveImageUrl, uploadImage, uploadRemoteImageToServer } from "@/services/image-storage";
+import { deleteImagePreviews, deleteStoredImages, deleteUnusedImagePreviews, ensureImagePreview, getImagePreviewRevision, imageToDataUrl, previewUrlFor, resolveImageUrl, subscribeImagePreviews, uploadImage, uploadRemoteImageToServer } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
@@ -718,7 +718,8 @@ export default function ImagePage() {
         const deletedLogs = logs.filter((log) => selectedLogIds.includes(log.id));
         const nextLogs = logs.filter((log) => !selectedLogIds.includes(log.id));
         const imageKeys = disposableLogStorageKeys(deletedLogs, nextLogs);
-        void Promise.all([deleteBackendImageTasks(deletedLogs), deleteAccountImageLogs(deletedLogs), deleteStoredImages(imageKeys), ...deletedLogs.map((log) => logStore.removeItem(log.id))]).then(async () => {
+        const previewKeys = deletedLogs.flatMap((log) => log.images.map((image) => `image-result:${image.id}`));
+        void Promise.all([deleteBackendImageTasks(deletedLogs), deleteAccountImageLogs(deletedLogs), deleteStoredImages(imageKeys), deleteImagePreviews(previewKeys), ...deletedLogs.map((log) => logStore.removeItem(log.id))]).then(async () => {
             setLogs(nextLogs);
             setReferences((value) => value.filter((item) => !item.storageKey || !imageKeys.includes(item.storageKey)));
             await persistImageHistory(nextLogs, categories);
@@ -742,7 +743,8 @@ export default function ImagePage() {
             onOk: async () => {
                 const nextLogs = logs.filter((item) => item.id !== log.id);
                 const imageKeys = disposableLogStorageKeys([log], nextLogs);
-                await Promise.all([deleteBackendImageTasks([log]), deleteAccountImageLogs([log]), deleteStoredImages(imageKeys), logStore.removeItem(log.id)]);
+                const previewKeys = log.images.map((image) => `image-result:${image.id}`);
+                await Promise.all([deleteBackendImageTasks([log]), deleteAccountImageLogs([log]), deleteStoredImages(imageKeys), deleteImagePreviews(previewKeys), logStore.removeItem(log.id)]);
                 setLogs(nextLogs);
                 setReferences((value) => value.filter((item) => !item.storageKey || !imageKeys.includes(item.storageKey)));
                 await persistImageHistory(nextLogs, categories);
@@ -793,7 +795,7 @@ export default function ImagePage() {
             if (!active()) return;
             await logStore.setItem(log.id, serializeLog(persistedLog));
             if (!active()) return;
-            await persistImageHistory(nextLogs, categories);
+            await persistImageHistory([persistedLog], categories);
         })();
         saveLogChainRef.current = nextChain;
         await nextChain;
@@ -1911,6 +1913,7 @@ function ResultsPanel({
     const { message } = App.useApp();
     const [creatingCategory, setCreatingCategory] = useState(false);
     const [categoryName, setCategoryName] = useState("");
+    useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision, getImagePreviewRevision);
     const liveImageIds = new Set(results.map((result) => result.image?.id).filter((id): id is string => Boolean(id)));
     const liveLogIds = new Set(results.flatMap(imageResultIdentityKeys));
     const baseVisibleLogs = logs.filter((log) => !imageLogIdentityKeys(log).some((key) => liveLogIds.has(key)) && !log.images.some((image) => liveImageIds.has(image.id)));
@@ -1937,6 +1940,11 @@ function ResultsPanel({
     useEffect(() => {
         if (activeCategoryId && !categories.some((category) => category.id === activeCategoryId)) onActiveCategoryChange(null);
     }, [activeCategoryId, categories, onActiveCategoryChange]);
+
+    useEffect(() => {
+        [...results.flatMap((result) => result.image ? [result.image] : []), ...logs.flatMap((log) => log.images)]
+            .forEach((image) => void ensureImagePreview(`image-result:${image.id}`, image.dataUrl, image.storageKey));
+    }, [logs, results]);
 
     return (
         <div className={`thin-scrollbar rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto lg:p-5 ${className}`}>
@@ -2081,7 +2089,7 @@ function CategoryCard({
                         {images.map((image, index) => (
                             <img
                                 key={`${image.id}-${index}`}
-                                src={image.dataUrl}
+                                src={previewUrlFor(`image-result:${image.id}`, image.storageKey || image.dataUrl) || image.dataUrl}
                                 alt=""
                                 className={`${images.length === 1 ? "inset-0 size-full rounded-none border-0" : "h-[92%] w-[86%] rounded-lg border border-white/80 dark:border-stone-900"} absolute object-cover shadow-xl transition-transform duration-200 group-hover:scale-[1.02]`}
                                 style={{
@@ -2173,7 +2181,7 @@ function ResultImageCard({
                     <Tag className="m-0 text-[10px]" color="blue">{t("新生成")}</Tag>
                 </div>
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
-                <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
+                <Image src={previewUrlFor(`image-result:${image.id}`, image.storageKey || image.dataUrl) || image.dataUrl} preview={{ src: image.dataUrl }} alt={`生成结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
             </div>
             <TaskInfo result={result} onCopyPrompt={onCopyPrompt} />
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-t border-stone-200 px-2.5 py-2 dark:border-stone-800">
@@ -2370,7 +2378,7 @@ function HistoryLogCard({
                     <Tag className="m-0 text-[10px]">{log.imageCount}  {t("张")}</Tag>
                 </div>
                 {firstImage ? (
-                    <Image src={firstImage.dataUrl} alt={`历史结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
+                    <Image src={previewUrlFor(`image-result:${firstImage.id}`, firstImage.storageKey || firstImage.dataUrl) || firstImage.dataUrl} preview={{ src: firstImage.dataUrl }} alt={`历史结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
                 ) : (
                     <div className="flex size-full flex-col items-center justify-center gap-2 p-5 text-center text-sm text-red-500">
                         <AlertCircle className="size-7" />
@@ -2380,7 +2388,7 @@ function HistoryLogCard({
                 {displayImages.length > 1 ? (
                     <div className="absolute bottom-1.5 left-1.5 right-1.5 flex gap-1 overflow-hidden">
                         {displayImages.slice(0, 4).map((image) => (
-                            <img key={image.id} src={image.dataUrl} alt="" className="size-8 shrink-0 rounded border border-white/80 object-cover shadow-sm dark:border-stone-900/80" />
+                            <img key={image.id} src={previewUrlFor(`image-result:${image.id}`, image.storageKey || image.dataUrl) || image.dataUrl} alt="" className="size-8 shrink-0 rounded border border-white/80 object-cover shadow-sm dark:border-stone-900/80" />
                         ))}
                     </div>
                 ) : null}
@@ -2863,6 +2871,10 @@ async function replaceStoredImageHistory(logs: GenerationLog[], categories: Gene
     await logStore.clear();
     await Promise.all(logs.map((log) => logStore.setItem(log.id, serializeLog(log))));
     await categoryStore.setItem(CATEGORY_STORE_KEY, categories);
+    await deleteUnusedImagePreviews(
+        "image-result:",
+        new Set(logs.flatMap((log) => log.images.map((image) => `image-result:${image.id}`))),
+    );
 }
 
 function withWorkflowLogCategories(logs: GenerationLog[], categories: GenerationCategory[]) {
@@ -2967,6 +2979,11 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
             });
         }
     }
+    await Promise.all(
+        visibleImages.map((image) =>
+            ensureImagePreview(`image-result:${image.id}`, image.dataUrl, image.storageKey, image.storageKey || image.dataUrl, true),
+        ),
+    );
     const config = normalizeLogConfig(log);
     return {
         id: log.id || nanoid(),
