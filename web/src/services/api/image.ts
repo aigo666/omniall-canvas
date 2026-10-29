@@ -1456,7 +1456,8 @@ function isAgnesImageModel(model: string) {
 }
 
 function isAgnesImage21Model(model: string) {
-    return model.toLowerCase().replace(/[\s_]+/g, "-") === "agnes-image-2.1-flash";
+    const m = model.toLowerCase().replace(/[\s_]+/g, "-");
+    return m.startsWith("agnes-image-2.1") || m.startsWith("agnes-image-2.5");
 }
 
 function normalizeAgnesImage21Ratio(value: string) {

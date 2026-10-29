@@ -7,7 +7,7 @@ export function isCogVideoX3Model(modelName: string) {
 }
 
 export function isAgnesVideoV25Model(modelName: string) {
-    return modelKey(modelName) === "agnes-video-2-5";
+    return modelKey(modelName).startsWith("agnes-video-2-5");
 }
 
 export function isWan3VideoModel(modelName: string) {
