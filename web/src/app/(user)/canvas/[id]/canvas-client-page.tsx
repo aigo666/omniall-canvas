@@ -31,6 +31,12 @@ import { captureVideoFrame, type VideoFramePosition } from "../utils/canvas-vide
 import { PANORAMA_IMAGE_SIZE, PANORAMA_NODE_SIZE, buildPanoramaPrompt, isCanvasImageNodeType, isPanoramaNodeType } from "../utils/canvas-panorama";
 import { applyCameraPrompt } from "../utils/canvas-camera";
 import { GROUP_PADDING, findContainingGroupId, findGroupDropTarget, getNodeBounds, snapNodesIntoGroup } from "../utils/canvas-group";
+import {
+    calculateCanvasAlignment,
+    createCanvasAlignmentContext,
+    type CanvasAlignmentContext,
+    type CanvasAlignmentGuides,
+} from "../utils/canvas-alignment";
 import { App, Button, Dropdown, Modal, Slider } from "antd";
 import { isCogVideoX3Model, modelKey, supportsVideoAudioGeneration, supportsVideoFrameReferences } from "@/lib/video-model-capabilities";
 import { isMimoVoiceCloneModel } from "@/lib/mimo-tts";
@@ -336,6 +342,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
     const uploadingMediaNodeIdsRef = useRef(new Set<string>());
     const uploadingImageNodeIdsRef = useRef(new Set<string>());
     const nodeDraggingRef = useRef(false);
+    const alignmentContextRef = useRef<CanvasAlignmentContext | null>(null);
     const dragRef = useRef<{
         isDraggingNode: boolean;
         hasMoved: boolean;
@@ -427,6 +434,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
     const [openingBatchIds, setOpeningBatchIds] = useState<Set<string>>(new Set());
     const [isNodeDragging, setIsNodeDragging] = useState(false);
     const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
+    const [alignmentGuides, setAlignmentGuides] = useState<CanvasAlignmentGuides>({});
     const [referencePickerNodeId, setReferencePickerNodeId] = useState<string | null>(null);
     const [canvasNow, setCanvasNow] = useState(Date.now());
     const resolvedAgentConfig = useMemo<CanvasAgentConfig>(
@@ -1703,9 +1711,14 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
             startY: event.clientY,
             initialSelectedNodes: currentNodes.filter((node) => dragIds.has(node.id)).map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
         };
+        alignmentContextRef.current = createCanvasAlignmentContext(
+            currentNodes.filter((node) => !isHiddenBatchChild(node, currentNodes)),
+            dragIds,
+        );
         historyPausedRef.current = true;
         nodeDraggingRef.current = true;
         setIsNodeDragging(true);
+        setAlignmentGuides({});
     }, []);
 
     const finishNodeDrag = useCallback((clientX?: number, clientY?: number) => {
@@ -1721,8 +1734,15 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
         const wasClick = !dragRef.current.hasMoved && dragRef.current.initialSelectedNodes.length === 1;
         const clickedNodeId = dragRef.current.clickedGroupId || dragRef.current.initialSelectedNodes[0]?.id;
         const currentViewport = viewportRef.current;
-        const dx = clientX == null ? 0 : (clientX - dragRef.current.startX) / currentViewport.k;
-        const dy = clientY == null ? 0 : (clientY - dragRef.current.startY) / currentViewport.k;
+        const rawOffset = {
+            x: clientX == null ? 0 : (clientX - dragRef.current.startX) / currentViewport.k,
+            y: clientY == null ? 0 : (clientY - dragRef.current.startY) / currentViewport.k,
+        };
+        const { x: dx, y: dy } = calculateCanvasAlignment(
+            alignmentContextRef.current,
+            rawOffset,
+            7 / currentViewport.k,
+        ).offset;
         const initialPositions = dragRef.current.initialSelectedNodes;
 
         historyPausedRef.current = false;
@@ -1749,7 +1769,9 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
         dragRef.current.hasMoved = false;
         dragRef.current.clickedGroupId = null;
         dragRef.current.initialSelectedNodes = [];
+        alignmentContextRef.current = null;
         setDropTargetGroupId(null);
+        setAlignmentGuides({});
         if (wasClick && clickedNodeId) {
             const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
             if (clickedNode?.type === CanvasNodeType.Group) {
@@ -1767,13 +1789,22 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
             const currentViewport = viewportRef.current;
 
             if (dragRef.current.isDraggingNode) {
-                const dx = (event.clientX - dragRef.current.startX) / currentViewport.k;
-                const dy = (event.clientY - dragRef.current.startY) / currentViewport.k;
+                const rawOffset = {
+                    x: (event.clientX - dragRef.current.startX) / currentViewport.k,
+                    y: (event.clientY - dragRef.current.startY) / currentViewport.k,
+                };
                 const initialPositions = dragRef.current.initialSelectedNodes;
                 if (Math.abs(event.clientX - dragRef.current.startX) > 3 || Math.abs(event.clientY - dragRef.current.startY) > 3) {
                     dragRef.current.hasMoved = true;
                 }
 
+                const aligned = calculateCanvasAlignment(
+                    alignmentContextRef.current,
+                    rawOffset,
+                    7 / currentViewport.k,
+                );
+                const { x: dx, y: dy } = aligned.offset;
+                const nextGuides = dragRef.current.hasMoved ? aligned.guides : {};
                 const movedIds = new Set(initialPositions.map((item) => item.id));
                 const previewNodes = nodesRef.current.map((node) => {
                     const initial = initialPositions.find((item) => item.id === node.id);
@@ -1783,6 +1814,11 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
 
                 if (rafRef.current) cancelAnimationFrame(rafRef.current);
                 rafRef.current = requestAnimationFrame(() => {
+                    setAlignmentGuides((current) =>
+                        current.vertical === nextGuides.vertical && current.horizontal === nextGuides.horizontal
+                            ? current
+                            : nextGuides,
+                    );
                     setNodes((prev) =>
                         prev.map((node) => {
                             const initial = initialPositions.find((item) => item.id === node.id);
@@ -4472,6 +4508,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
                     viewport={viewport}
                     tool={canvasTool}
                     backgroundMode={backgroundMode}
+                    alignmentGuides={alignmentGuides}
                     onViewportChange={(next) => {
                         setViewport(next);
                         setContextMenu(null);
