@@ -531,6 +531,36 @@ func readAIRequestCount(body []byte, contentType string, video bool) int {
 	return count
 }
 
+func readAIRequestResolution(body []byte, contentType string) string {
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		_, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return ""
+		}
+		form, err := multipart.NewReader(bytes.NewReader(body), params["boundary"]).ReadForm(32 << 20)
+		if err != nil {
+			return ""
+		}
+		defer form.RemoveAll()
+		for _, field := range []string{"resolution_name", "resolution"} {
+			if values := form.Value[field]; len(values) > 0 {
+				return values[0]
+			}
+		}
+		return ""
+	}
+	var payload map[string]any
+	if json.Unmarshal(body, &payload) != nil {
+		return ""
+	}
+	return firstNonEmpty(
+		readStringPath(payload, "resolution_name"),
+		readStringPath(payload, "resolution"),
+		readStringPath(payload, "parameters.resolution"),
+		readStringPath(payload, "_parameterTranslation.variables.resolution"),
+	)
+}
+
 func resolveAIProxyURL(channel model.ModelChannel, modelName string, path string) string {
 	for _, adapter := range builtinAIProtocols {
 		if adapter.url != nil {

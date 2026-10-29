@@ -68,7 +68,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const billingModel = workflowRef
         ? `workflow:${workflowRef.scope}:${workflowRef.channelId}:${workflowRef.kind}:${workflowRef.workflowId}`
         : config.model;
-    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: billingModel, count: mode === "image" ? config.count : 1, seconds: mode === "video" ? config.videoSeconds : undefined });
+    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: billingModel, resolution: mode === "video" ? config.vquality : undefined, count: mode === "image" ? config.count : 1, seconds: mode === "video" ? config.videoSeconds : undefined });
 
     useEffect(() => {
         setPrompt(sourcePrompt);

@@ -28,7 +28,7 @@ import {
     Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { App, Button, Checkbox, Drawer, Dropdown, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
+import { App, Button, Checkbox, Dropdown, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
 import { CanvasImageSettingsPopover } from "@/app/(user)/canvas/components/canvas-image-settings-popover";
 import { CanvasPromptPopover } from "@/app/(user)/canvas/components/canvas-prompt-popover";
 import localforage from "localforage";
