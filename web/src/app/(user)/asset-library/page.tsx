@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Copy, FolderPlus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +33,7 @@ export default function AssetLibraryPage() {
 
     useEffect(() => {
         if (query.isError) {
-            message.error(query.error instanceof Error ? query.error.message : "获取素材库失败");
+            message.error(query.error instanceof Error ? query.error.message : t("获取素材库失败"));
         }
     }, [message, query.error, query.isError]);
 
@@ -48,13 +49,13 @@ export default function AssetLibraryPage() {
 
     const saveToMyAssets = async (asset: AssetLibraryItem) => {
         try {
-            if (useAssetStore.getState().assets.some((item) => item.metadata?.source === "asset-library" && item.metadata.assetId === asset.id)) return void message.info("该素材已在我的素材中");
+            if (useAssetStore.getState().assets.some((item) => item.metadata?.source === "asset-library" && item.metadata.assetId === asset.id)) return void message.info(t("该素材已在我的素材中"));
             if (asset.type === "image") {
                 const blob = await (await fetch(getProxyUrl(asset.url))).blob();
                 const bitmap = await createImageBitmap(blob);
                 const { width, height } = bitmap;
                 bitmap.close();
-                if (useAssetStore.getState().assets.some((item) => item.metadata?.source === "asset-library" && item.metadata.assetId === asset.id)) return void message.info("该素材已在我的素材中");
+                if (useAssetStore.getState().assets.some((item) => item.metadata?.source === "asset-library" && item.metadata.assetId === asset.id)) return void message.info(t("该素材已在我的素材中"));
                 addAsset({
                     kind: "image",
                     title: asset.title,
@@ -99,9 +100,9 @@ export default function AssetLibraryPage() {
                     metadata: { source: "asset-library", assetId: asset.id },
                 });
             }
-            message.success("已加入我的素材");
+            message.success(t("已加入我的素材"));
         } catch {
-            message.error("加入失败");
+            message.error(t("加入失败"));
         }
     };
 
@@ -118,8 +119,8 @@ export default function AssetLibraryPage() {
             <main className="min-h-0 flex-1 overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-8 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]">
                 <div className="pb-8">
                     <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">素材库</h1>
-                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">挑选团队素材，加入我的素材后继续编辑和使用。</p>
+                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">{t("素材库")}</h1>
+                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">{t("挑选团队素材，加入我的素材后继续编辑和使用。")}</p>
                     </div>
                     <div className="mx-auto mt-8 w-full max-w-2xl">
                         <Input
@@ -127,7 +128,7 @@ export default function AssetLibraryPage() {
                             className="w-full"
                             prefix={<Search className="size-4 text-stone-400" />}
                             value={keyword}
-                            placeholder="搜索标题、内容、分类或标签"
+                            placeholder={t("搜索标题、内容、分类或标签")}
                             onChange={(event) => {
                                 setPage(1);
                                 setKeyword(event.target.value);
@@ -136,14 +137,14 @@ export default function AssetLibraryPage() {
                     </div>
                     <div className="mx-auto mt-6 max-w-6xl space-y-3">
                         <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">类型</div>
+                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("类型")}</div>
                             <div className="flex flex-wrap gap-2">
                                 {[
-                                    { label: "全部", value: "" },
-                                    { label: "文本", value: "text" },
-                                    { label: "图片", value: "image" },
-                                    { label: "视频", value: "video" },
-                                    { label: "音频", value: "audio" },
+                                    { label: t("全部"), value: "" },
+                                    { label: t("文本"), value: "text" },
+                                    { label: t("图片"), value: "image" },
+                                    { label: t("视频"), value: "video" },
+                                    { label: t("音频"), value: "audio" },
                                 ].map((item) => (
                                     <Tag.CheckableTag
                                         key={item.value || "all"}
@@ -160,20 +161,20 @@ export default function AssetLibraryPage() {
                             </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">分类</div>
+                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("分类")}</div>
                             <div className="thin-scrollbar flex max-h-[112px] flex-wrap gap-2 overflow-y-auto pr-1">
                                 {["", ...categories].map((item) => (
                                     <Tag.CheckableTag key={item || "all"} checked={selectedCategory === item} className={cn("prompt-filter-tag", selectedCategory === item && "is-active")} onChange={() => {
                                         setPage(1);
                                         setSelectedCategory(item);
                                     }}>
-                                        {item || "全部"}
+                                        {item || t("全部")}
                                     </Tag.CheckableTag>
                                 ))}
                             </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">标签</div>
+                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("标签")}</div>
                             <div className="thin-scrollbar flex max-h-[112px] flex-wrap gap-2 overflow-y-auto pr-1">
                                 <Tag.CheckableTag
                                     checked={selectedTags.length === 0}
@@ -183,7 +184,8 @@ export default function AssetLibraryPage() {
                                         setSelectedTags([]);
                                     }}
                                 >
-                                    全部
+                                    
+                                    {t("全部")}
                                 </Tag.CheckableTag>
                                 {availableTags.map((tag) => (
                                     <Tag.CheckableTag
@@ -210,7 +212,7 @@ export default function AssetLibraryPage() {
                         ))}
                     </div>
 
-                    {!items.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有找到素材" className="py-20" /> : null}
+                    {!items.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("没有找到素材")} className="py-20" /> : null}
 
                     <div className="flex justify-center">
                         <Pagination current={page} pageSize={PAGE_SIZE} total={total} showSizeChanger={false} onChange={(nextPage) => setPage(nextPage)} />
@@ -218,13 +220,13 @@ export default function AssetLibraryPage() {
                 </div>
             </main>
 
-            <Drawer title="素材详情" open={Boolean(selectedAsset)} size="large" onClose={() => setSelectedAsset(null)}>
+            <Drawer title={t("素材详情")} open={Boolean(selectedAsset)} size="large" onClose={() => setSelectedAsset(null)}>
                 {selectedAsset ? (
                     <div className="space-y-5">
                         {selectedAsset.coverUrl ? (
                             <Image src={selectedAsset.coverUrl} alt={selectedAsset.title} className="rounded-lg" />
                         ) : (
-                            <div className="rounded-lg border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">{selectedAsset.content || "暂无封面"}</div>
+                            <div className="rounded-lg border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">{selectedAsset.content || t("暂无封面")}</div>
                         )}
                         <div>
                             <Typography.Title level={4} className="!mb-2">
@@ -239,7 +241,8 @@ export default function AssetLibraryPage() {
                         </div>
                         <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-800">
                             <Typography.Text type="secondary" className="block text-xs">
-                                内容
+                                
+                                {t("内容")}
                             </Typography.Text>
                             {selectedAsset.type === "text" ? <Typography.Paragraph className="mt-2 whitespace-pre-wrap">{selectedAsset.content}</Typography.Paragraph> : <Typography.Text className="mt-2 block">{selectedAsset.url}</Typography.Text>}
                         </div>
@@ -247,16 +250,19 @@ export default function AssetLibraryPage() {
                         <div className="flex flex-wrap gap-2">
                             {selectedAsset.type === "text" ? (
                                 <Button type="primary" icon={<Copy className="size-4" />} onClick={() => copyText(selectedAsset.content)}>
-                                    复制文本
+                                    
+                                    {t("复制文本")}
                                 </Button>
                             ) : null}
                             {selectedAsset.type !== "text" ? (
                                 <Button type="primary" icon={<Copy className="size-4" />} onClick={() => copyText(selectedAsset.url)}>
-                                    复制链接
+                                    
+                                    {t("复制链接")}
                                 </Button>
                             ) : null}
                             <Button icon={<FolderPlus className="size-4" />} onClick={() => void saveToMyAssets(selectedAsset)}>
-                                加入我的素材
+                                
+                                {t("加入我的素材")}
                             </Button>
                         </div>
                     </div>
@@ -278,7 +284,7 @@ function LibraryCard({ asset, onOpen, onAdd }: { asset: AssetLibraryItem; onOpen
                     {cover ? (
                         <img src={cover} alt={asset.title} className="aspect-[4/3] w-full object-cover" />
                     ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.content || "暂无封面"}</div>
+                        <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.content || t("暂无封面")}</div>
                     )}
                 </button>
             }
@@ -298,16 +304,18 @@ function LibraryCard({ asset, onOpen, onAdd }: { asset: AssetLibraryItem; onOpen
                                 {tag}
                             </Tag>
                         ))}
-                        {!asset.tags.length ? <Tag className="m-0 text-[11px]">无标签</Tag> : null}
+                        {!asset.tags.length ? <Tag className="m-0 text-[11px]">{t("无标签")}</Tag> : null}
                     </div>
                 </div>
             </button>
             <div className="flex items-center gap-2 px-4 pb-4">
                 <Button size="small" onClick={onOpen}>
-                    查看
+                    
+                    {t("查看")}
                 </Button>
                 <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={onAdd}>
-                    加入我的素材
+                    
+                    {t("加入我的素材")}
                 </Button>
             </div>
         </Card>
@@ -315,8 +323,8 @@ function LibraryCard({ asset, onOpen, onAdd }: { asset: AssetLibraryItem; onOpen
 }
 
 function assetTypeLabel(type: AssetLibraryItem["type"]) {
-    if (type === "image") return "图片";
-    if (type === "video") return "视频";
-    if (type === "audio") return "音频";
-    return "文本";
+    if (type === "image") return t("图片");
+    if (type === "video") return t("视频");
+    if (type === "audio") return t("音频");
+    return t("文本");
 }

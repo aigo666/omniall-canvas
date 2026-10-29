@@ -15,6 +15,7 @@ import { buildApiUrl, channelIdForActiveModel, channelProtocolForConfig, localCh
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceAudio } from "@/types/media";
 
+import { t } from "@/i18n";
 export type CanvasAudioTask = {
     id: string;
     status: "queued" | "processing" | "completed" | "failed" | string;
@@ -97,14 +98,14 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, r
 		const result = await executeParameterTranslation({...config,model},translation,await audioTranslationInput(config,model,prompt,referenceAudio),signal);
 		refreshRemoteUser(config);
 		const response = await fetch(result.urls[0], { signal });
-		if (!response.ok) throw new Error("读取生成音频失败");
+		if (!response.ok) throw new Error(t("读取生成音频失败"));
 		return response.blob();
 	}
     assertAudioConfig(config, model);
 
     try {
         if (isGeminiTtsModel(model) && isGeminiConfig(config, model)) {
-            if (referenceAudio) throw new Error("Gemini TTS 不支持参考音频");
+            if (referenceAudio) throw new Error(t("Gemini TTS 不支持参考音频"));
             const nativeBody = buildGeminiTtsRequest(config, prompt);
             const body = usesAccountProxy(config) ? { model, ...nativeBody } : nativeBody;
             const channel = localChannelForActiveModel(config);
@@ -191,7 +192,7 @@ export async function createCanvasAudioTask(config: AiConfig, prompt: string, op
     const response = await fetch("/api/v1/canvas/audio-tasks", request);
     if (!response.ok) throw new Error(await readFetchError(response, "音频任务创建失败"));
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasAudioTask };
-    if (payload.code !== 0 || !payload.data) throw new Error(payload.msg || "音频任务创建失败");
+    if (payload.code !== 0 || !payload.data) throw new Error(payload.msg || t("音频任务创建失败"));
     refreshRemoteUser(config);
     return syncGeneratedAudio(payload.data);
 }
@@ -224,14 +225,14 @@ async function audioTranslationInput(config: AiConfig, model: string, prompt: st
 
 export async function pollCanvasAudioTaskStatus(taskId: string, signal?: AbortSignal): Promise<CanvasAudioTask> {
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录后再使用云端渠道");
+    if (!token) throw new Error(t("请先登录后再使用云端渠道"));
     const response = await fetch(`/api/v1/canvas/audio-tasks/${encodeURIComponent(taskId)}`, {
         signal,
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error(await readFetchError(response, "读取音频任务失败"));
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasAudioTask };
-    if (payload.code !== 0 || !payload.data) throw new Error(payload.msg || "读取音频任务失败");
+    if (payload.code !== 0 || !payload.data) throw new Error(payload.msg || t("读取音频任务失败"));
     return syncGeneratedAudio(payload.data);
 }
 
@@ -244,16 +245,16 @@ async function syncGeneratedAudio(task: CanvasAudioTask, resultId = task.started
 
 async function buildAudioSpeechRequest(config: AiConfig, model: string, prompt: string, referenceAudio?: ReferenceAudio) {
     if (isAutoDLConfig(config, model)) {
-        if (!referenceAudio) throw new Error("请连接并选择参考音频节点");
+        if (!referenceAudio) throw new Error(t("请连接并选择参考音频节点"));
         const { autoDLReferenceURL } = await import("./direct-ai");
         return { model, input: prompt, reference_audio: await autoDLReferenceURL(referenceAudio) };
     }
     if (isGeminiTtsModel(model) && isGeminiConfig(config, model)) {
-        if (referenceAudio) throw new Error("Gemini TTS 不支持参考音频");
+        if (referenceAudio) throw new Error(t("Gemini TTS 不支持参考音频"));
         return { model, ...buildGeminiTtsRequest(config, prompt) };
     }
     if (isGlmTtsModel(model)) {
-        if (prompt.length > 1024) throw new Error("GLM-TTS 文本不能超过 1024 个字符");
+        if (prompt.length > 1024) throw new Error(t("GLM-TTS 文本不能超过 1024 个字符"));
         return {
             model,
             input: prompt,
@@ -325,7 +326,7 @@ async function buildMiMoNativeRequest(config: AiConfig, model: string, prompt: s
     const instructions = config.audioInstructions.trim();
     if (isMimoVoiceDesignModel(model)) {
         const description = config.mimoVoiceDesignPrompt.trim();
-        if (!description) throw new Error("请填写音色描述");
+        if (!description) throw new Error(t("请填写音色描述"));
         messages.push({ role: "user", content: description });
     } else if (instructions && (isMimoPresetTtsModel(model) || isMimoVoiceCloneModel(model))) {
         messages.push({ role: "user", content: instructions });
@@ -344,16 +345,16 @@ async function buildMiMoNativeRequest(config: AiConfig, model: string, prompt: s
 }
 
 async function referenceAudioDataUrl(referenceAudio?: ReferenceAudio) {
-    if (!referenceAudio) throw new Error("请连接并选择参考音频节点");
+    if (!referenceAudio) throw new Error(t("请连接并选择参考音频节点"));
     const url = await resolveMediaUrl(referenceAudio.storageKey, referenceAudio.url);
-    if (!url) throw new Error("参考音频不可用");
+    if (!url) throw new Error(t("参考音频不可用"));
     const response = await fetch(url);
     if (!response.ok) throw new Error(`读取参考音频失败（${response.status}）`);
     const blob = await response.blob();
     const mimeType = normalizeCloneMimeType(blob.type) || normalizeCloneMimeType(referenceAudio.type);
-    if (!mimeType) throw new Error("参考音频仅支持 MP3 或 WAV");
+    if (!mimeType) throw new Error(t("参考音频仅支持 MP3 或 WAV"));
     const base64 = await blobToBase64(blob);
-    if (base64.length > 10 * 1024 * 1024) throw new Error("参考音频 Base64 编码后不能超过 10MB");
+    if (base64.length > 10 * 1024 * 1024) throw new Error(t("参考音频 Base64 编码后不能超过 10MB"));
     return `data:${mimeType};base64,${base64}`;
 }
 
@@ -367,7 +368,7 @@ function normalizeCloneMimeType(value: string) {
 function blobToBase64(blob: Blob) {
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onerror = () => reject(new Error("读取参考音频失败"));
+        reader.onerror = () => reject(new Error(t("读取参考音频失败")));
         reader.onload = () => {
             const value = typeof reader.result === "string" ? reader.result : "";
             const separator = value.indexOf(",");
@@ -379,7 +380,7 @@ function blobToBase64(blob: Blob) {
 
 function decodeMiMoAudio(payload: MiMoAudioResponse, format: string) {
     const data = payload.choices?.[0]?.message?.audio?.data?.trim() || "";
-    if (!data) throw new Error("MiMo 没有返回音频数据");
+    if (!data) throw new Error(t("MiMo 没有返回音频数据"));
     const binary = atob(data);
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -387,16 +388,16 @@ function decodeMiMoAudio(payload: MiMoAudioResponse, format: string) {
 }
 
 function assertAudioConfig(config: AiConfig, model: string) {
-    if (!model) throw new Error("请先配置音频模型");
+    if (!model) throw new Error(t("请先配置音频模型"));
     if (config.channelMode !== "local") return;
     if (!isMimoTtsModel(model) && !isGeminiConfig(config, model) && !isAutoDLConfig(config, model)) {
-        if (!config.baseUrl.trim()) throw new Error("请先配置 Base URL");
-        if (!config.apiKey.trim()) throw new Error("请先配置 API Key");
+        if (!config.baseUrl.trim()) throw new Error(t("请先配置 Base URL"));
+        if (!config.apiKey.trim()) throw new Error(t("请先配置 API Key"));
         return;
     }
     const channel = localChannelForActiveModel(config);
-    if (!(channel?.baseUrl || config.baseUrl).trim()) throw new Error("请先配置 Base URL");
-    if (!(channel?.apiKey || config.apiKey).trim()) throw new Error("请先配置 API Key");
+    if (!(channel?.baseUrl || config.baseUrl).trim()) throw new Error(t("请先配置 Base URL"));
+    if (!(channel?.apiKey || config.apiKey).trim()) throw new Error(t("请先配置 API Key"));
 }
 
 async function assertAudioBlob(blob: Blob) {
@@ -407,7 +408,7 @@ async function assertAudioBlob(blob: Blob) {
     } catch {
         return;
     }
-    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "音频生成失败");
+    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || t("音频生成失败"));
     if (payload.error?.message) throw new Error(payload.error.message);
 }
 
@@ -429,7 +430,7 @@ async function readFetchError(response: Response, fallback: string) {
 }
 
 function statusMessage(status: number | undefined, fallback: string) {
-    if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、套餐权限或模型权限";
-    if (status === 429) return "请求被限流或额度不足，请稍后重试";
+    if (status === 401 || status === 403) return t("鉴权失败，请检查 API Key、套餐权限或模型权限");
+    if (status === 429) return t("请求被限流或额度不足，请稍后重试");
     return status ? `${fallback}（${status}）` : fallback;
 }

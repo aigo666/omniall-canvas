@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@property --flow-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -47,6 +53,14 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+html {
+    background-color: #0b0b0b;
+}
+
+html:not(.dark) {
+    background-color: #f7f7f5;
+}
+
 :root {
     --radius: 0.625rem;
     --border: oklch(0.922 0 0);
@@ -57,8 +71,10 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary: #e0704a;
+    --primary-foreground: #ffffff;
+    --primary-hover: #eb8562;
+    --primary-active: #c85a38;
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
@@ -91,8 +107,10 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: #c8ff00;
+    --primary-foreground: #0a0a0a;
+    --primary-hover: #d6ff33;
+    --primary-active: #b8ef00;
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -139,6 +157,40 @@
     }
 }
 
+/* Light theme: textured orange primary buttons + readable tooltips */
+html:not(.dark) .ant-btn-primary:not(:disabled):not(.ant-btn-dangerous) {
+    color: var(--primary-foreground) !important;
+    background: linear-gradient(180deg, var(--primary-hover) 0%, var(--primary) 52%, var(--primary-active) 100%) !important;
+    border-color: var(--primary-active) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 1px 2px rgba(120, 48, 24, 0.18);
+}
+
+html:not(.dark) .ant-btn-primary:not(:disabled):not(.ant-btn-dangerous):hover {
+    color: var(--primary-foreground) !important;
+    background: linear-gradient(180deg, #f09a78 0%, var(--primary-hover) 55%, var(--primary) 100%) !important;
+    border-color: var(--primary) !important;
+}
+
+html:not(.dark) .ant-btn-primary:not(:disabled):not(.ant-btn-dangerous):active {
+    color: var(--primary-foreground) !important;
+    background: linear-gradient(180deg, var(--primary) 0%, var(--primary-active) 100%) !important;
+    border-color: var(--primary-active) !important;
+}
+
+html:not(.dark) .ant-input:focus,
+html:not(.dark) .ant-input-focused,
+html:not(.dark) .ant-input-affix-wrapper-focused,
+html:not(.dark) .ant-select-focused .ant-select-selector {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent) !important;
+}
+
+.ant-tooltip .ant-tooltip-inner {
+    color: #fafaf9 !important;
+}
+
 @layer utilities {
     .ai-title-aurora {
         background: linear-gradient(90deg, #111827 0%, #111827 36%, #6b7280 54%, #111827 72%, #111827 100%);
@@ -165,6 +217,81 @@
         50% {
             background-position: 100% 50%;
             filter: drop-shadow(0 12px 28px rgba(28, 25, 23, 0.08));
+        }
+    }
+
+    .flow-border {
+        position: relative;
+        isolation: isolate;
+        border-color: transparent !important;
+        background-clip: padding-box;
+    }
+
+    .flow-border::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        padding: 1px;
+        background: conic-gradient(from var(--flow-angle, 0deg), transparent 0%, transparent 55%, #34d399 68%, #a7f3d0 74%, #ffffff 80%, #34d399 86%, transparent 100%);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: flow-border-spin 2.8s linear infinite;
+    }
+
+    .flow-border::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        z-index: -2;
+        border-radius: inherit;
+        background: radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.28), transparent 68%);
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    @keyframes flow-border-spin {
+        to {
+            --flow-angle: 360deg;
+        }
+    }
+
+    .home-logo-eye {
+        display: block;
+        width: 3.5px;
+        height: 3.5px;
+        border-radius: 999px;
+        background: #c8ff00;
+        box-shadow: 0 0 6px rgba(200, 255, 0, 0.55);
+        transform-origin: center;
+        animation: home-logo-blink 3.6s ease-in-out infinite;
+    }
+
+    .home-logo-eye--delay {
+        animation-delay: 0.12s;
+    }
+
+    @keyframes home-logo-blink {
+        0%,
+        88%,
+        100% {
+            transform: scaleY(1);
+            opacity: 1;
+        }
+
+        92%,
+        96% {
+            transform: scaleY(0.12);
+            opacity: 0.85;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .home-logo-eye {
+            animation: none;
         }
     }
 
@@ -465,8 +592,3 @@
     }
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;
-}

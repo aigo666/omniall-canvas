@@ -5,7 +5,7 @@
     "bin": {
         "canvas-agent": "index.mjs"
     },
-    "files": ["index.mjs", "codex.mjs"],
+    "files": ["index.mjs", "codex.mjs", "codex-bin.mjs", "cursor-bin.mjs"],
     "publishConfig": {
         "access": "public"
     },
@@ -23,7 +23,6 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.12.1",
-        "@openai/codex": "0.159.2",
         "express": "^5.1.0",
         "open": "^11.0.1"
     }

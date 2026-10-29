@@ -8,6 +8,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { uploadMediaFile } from "@/services/file-storage";
 import { WorkflowRequestError } from "./workflow-generation";
 
+import { t } from "@/i18n";
 export type TranslationInput = { kind: "image" | "video" | "audio"; variables: TranslationVariables };
 export type MatchedTranslation = { channelId: string; source: string; timeout: number; accountProxy: boolean };
 export type TranslationResult = { status: string; progress: number; taskIds?: string[]; urls: string[]; storageKey?: string; responseBody?: unknown };
@@ -50,7 +51,7 @@ export async function findParameterTranslation(config: AiConfig): Promise<Matche
 
 export function translationHeaders(config: AiConfig, match: MatchedTranslation): Record<string, string> {
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录后再使用账号渠道");
+    if (!token) throw new Error(t("请先登录后再使用账号渠道"));
     return { Authorization: `Bearer ${token}`, "Content-Type": "application/json", [config.channelMode === "remote" ? "X-Model-Channel-ID" : "X-User-Model-Channel-ID"]: match.channelId };
 }
 
@@ -89,7 +90,7 @@ export class BrowserParameterTranslation {
         const translation = new BrowserParameterTranslation(config, match, input);
         try {
             const code = (await translationPrograms(match.source))[config.model];
-            if (!code) throw new Error("该模型没有自定义配置");
+            if (!code) throw new Error(t("该模型没有自定义配置"));
             const polling = await translation.evaluate<boolean>({ action: "init", code, names: translationVariableNames, variables: { images: [], videos: [], audios: [], firstFrame: "", lastFrame: "", ...input.variables, model: config.model } });
             // 查询和提交的配置都在付费提交前完成编码校验。
             await translation.prepare(false, "");
@@ -107,7 +108,7 @@ export class BrowserParameterTranslation {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 this.dispose();
-                reject(new Error("自定配置执行超时"));
+                reject(new Error(t("自定配置执行超时")));
             }, 1000);
             this.worker.onmessage = (event) => {
                 clearTimeout(timer);
@@ -115,14 +116,14 @@ export class BrowserParameterTranslation {
             };
             this.worker.onerror = (event) => {
                 clearTimeout(timer);
-                reject(new Error(event.message || "配置执行失败"));
+                reject(new Error(event.message || t("配置执行失败")));
             };
             this.worker.postMessage(message);
         });
     }
     private async prepare(query: boolean, taskId: string) {
         const { method, request: plan, headers: common } = await this.evaluate<{ method: string; request: RequestPlan; headers: Record<string, unknown> }>({ action: "request", query });
-        if (!plan || typeof plan !== "object" || !plan.url?.trim()) throw new Error("自定配置缺少接口地址 url");
+        if (!plan || typeof plan !== "object" || !plan.url?.trim()) throw new Error(t("自定配置缺少接口地址 url"));
         const channel = localChannelForActiveModel(this.config);
         const key = channel?.apiKey || this.config.apiKey;
         const replace = (text: string) => text.replaceAll("{taskId}", taskId).replaceAll("{channelKey}", key);
@@ -131,14 +132,14 @@ export class BrowserParameterTranslation {
         const base = new URL(channel?.baseUrl || this.config.baseUrl);
         const absolute = /^[a-z][a-z0-9+.-]*:/i.test(target);
         const url = new URL(absolute ? target : `${base.origin}${base.pathname.replace(/\/$/, "")}/${target.replace(/^\//, "")}`);
-        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("接口地址必须是 HTTP 或 HTTPS 地址");
+        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error(t("接口地址必须是 HTTP 或 HTTPS 地址"));
         if (!absolute) for (const [name, values] of base.searchParams) if (!url.searchParams.has(name)) url.searchParams.append(name, values);
         for (const [name, value] of Object.entries(plan.params || {})) {
             url.searchParams.delete(name);
             for (const item of Array.isArray(value) ? (value.length ? value : [""]) : [value]) url.searchParams.append(name, text(item));
         }
         const headers = new Headers(Object.fromEntries(Object.entries(modelChannelAttributionHeaders(channel?.protocol || "")).filter((entry): entry is [string, string] => typeof entry[1] === "string")));
-        if (!common || typeof common !== "object" || Array.isArray(common) || (plan.headers && (typeof plan.headers !== "object" || Array.isArray(plan.headers)))) throw new Error("headers 必须是字段对象");
+        if (!common || typeof common !== "object" || Array.isArray(common) || (plan.headers && (typeof plan.headers !== "object" || Array.isArray(plan.headers)))) throw new Error(t("headers 必须是字段对象"));
         for (const [name, value] of Object.entries(common)) headers.set(name, text(value));
         const authNames = ["authorization", "x-api-key", "x-goog-api-key"];
         if (Object.keys(plan.headers || {}).some((name) => authNames.includes(name.toLowerCase()))) authNames.forEach((name) => headers.delete(name));
@@ -147,7 +148,7 @@ export class BrowserParameterTranslation {
         if (!customAuth) headers.set(channel?.protocol === "gemini" ? "x-goog-api-key" : "Authorization", channel?.protocol === "gemini" || channel?.protocol === "autodl" ? key : `Bearer ${key}`);
         const format = plan.format || "json",
             responseType = plan.responseType || "json";
-        if (!["json", "formData", "urlencoded", "raw"].includes(format) || !["json", "text", "blob", "arraybuffer"].includes(responseType)) throw new Error("不支持的请求或返回数据格式");
+        if (!["json", "formData", "urlencoded", "raw"].includes(format) || !["json", "text", "blob", "arraybuffer"].includes(responseType)) throw new Error(t("不支持的请求或返回数据格式"));
         const replaceValues = (value: unknown): unknown =>
             typeof value === "string" ? replace(value) : Array.isArray(value) ? value.map(replaceValues) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replaceValues(item)])) : value;
         const bodyValue = replaceValues(plan.body);
@@ -158,7 +159,7 @@ export class BrowserParameterTranslation {
                 if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
             } else if (format === "raw") body = text(bodyValue);
             else {
-                if (!bodyValue || typeof bodyValue !== "object" || Array.isArray(bodyValue)) throw new Error("表单请求体必须是字段对象");
+                if (!bodyValue || typeof bodyValue !== "object" || Array.isArray(bodyValue)) throw new Error(t("表单请求体必须是字段对象"));
                 const form = format === "formData" ? new FormData() : new URLSearchParams();
                 for (const [name, value] of Object.entries(bodyValue)) for (const item of Array.isArray(value) ? (value.length ? value : [""]) : [value]) form.append(name, text(item));
                 body = form;
@@ -166,7 +167,7 @@ export class BrowserParameterTranslation {
                 else if (!headers.has("Content-Type")) headers.set("Content-Type", "application/x-www-form-urlencoded");
             }
         }
-        if (["GET", "HEAD"].includes(method) && body !== undefined) throw new Error("浏览器的 GET 和 HEAD 请求不能携带请求体");
+        if (["GET", "HEAD"].includes(method) && body !== undefined) throw new Error(t("浏览器的 GET 和 HEAD 请求不能携带请求体"));
         return { url: url.href, options: { method, headers, body }, responseType };
     }
     async send(query = false, taskId = "", signal?: AbortSignal): Promise<TranslationResult> {
@@ -196,7 +197,7 @@ export class BrowserParameterTranslation {
             try {
                 data = JSON.parse(payload);
             } catch {
-                if (response.ok && !blob) throw new Error("接口没有返回有效 JSON");
+                if (response.ok && !blob) throw new Error(t("接口没有返回有效 JSON"));
                 if (blob) data = payload = null;
             }
         }
@@ -215,7 +216,7 @@ export class BrowserParameterTranslation {
         if (result.status === "completed") {
             if (binary) {
                 blob ||= await response.blob();
-                if (!blob.size) throw new Error("接口返回了空媒体文件");
+                if (!blob.size) throw new Error(t("接口返回了空媒体文件"));
                 if (this.input.kind !== "video") urls = [await readFileAsDataUrl(new File([blob], "media", { type: resultMime }))];
             } else urls = translationMediaURLs(result.value, this.input.kind, resultMime);
         }
@@ -238,7 +239,7 @@ export class BrowserParameterTranslation {
                 if (video.storageKey) return { ...result, urls: [video.video_url!], storageKey: video.storageKey, responseBody: data };
             }
         }
-        if (result.status === "completed" && !urls.length) throw new Error("生成已完成，但配置的结果位置没有可用媒体地址");
+        if (result.status === "completed" && !urls.length) throw new Error(t("生成已完成，但配置的结果位置没有可用媒体地址"));
         return { ...result, urls, responseBody: data };
     }
     async execute(onProgress?: (progress: number) => void, externalSignal?: AbortSignal): Promise<TranslationResult> {
@@ -281,7 +282,7 @@ export async function executeParameterTranslation(config: AiConfig, match: Match
         const data = response.headers.get("Content-Type")?.includes("json") ? await response.json() : await response.blob();
         if (!response.ok || (data.code && data.code !== 0)) throw new Error(data.msg || data.error?.message || `请求失败（${response.status}）`);
         const urls = data instanceof Blob ? [await readFileAsDataUrl(new File([data], "media", { type: data.type }))] : translationMediaURLs(data, input.kind);
-        if (!urls.length) throw new Error("接口没有返回可用媒体结果");
+        if (!urls.length) throw new Error(t("接口没有返回可用媒体结果"));
         return { status: "completed", progress: 100, urls };
     }
     const translation = await BrowserParameterTranslation.create(config, match, input);
@@ -293,7 +294,7 @@ export async function executeParameterTranslation(config: AiConfig, match: Match
 }
 
 export async function translationMediaAddress(url: string): Promise<string> {
-    if (!url) throw new Error("参考素材不可用");
+    if (!url) throw new Error(t("参考素材不可用"));
     if (url.startsWith("data:")) return url;
     if (/^https?:\/\//i.test(url) && new URL(url).origin !== location.origin && !["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname)) return url;
     const response = await fetch(url);

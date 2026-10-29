@@ -7,6 +7,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { fetchUserConfig, syncUserAssetData, syncUserImageHistory } from "./api/user-config";
 import { saveVideoGenerationLogs } from "./api/generation-logs";
 
+import { t } from "@/i18n";
 export async function checkLocalAssetsExist(): Promise<boolean> {
     const imageStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
     const mediaStore = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
@@ -37,7 +38,7 @@ export async function migrateLocalAssetsToCloud(
     onProgress: (current: number, total: number) => void
 ): Promise<void> {
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录");
+    if (!token) throw new Error(t("请先登录"));
 
     // 先拉取云端已存的数据
     const userConfig = await fetchUserConfig(token).catch(() => null);

@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 import { BetweenHorizontalStart, GalleryHorizontal, GalleryHorizontalEnd, Plus, Trash2 } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { t, useLocale } from "@/i18n";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ContextMenuState } from "../types";
 import type { VideoFramePosition } from "../utils/canvas-video-frame";
 
 export function CanvasNodeContextMenu({ menu, canCaptureVideoFrame, onClose, onCaptureVideoFrame, onDuplicate, onDelete }: { menu: ContextMenuState; canCaptureVideoFrame: boolean; onClose: () => void; onCaptureVideoFrame: (position: VideoFramePosition) => void; onDuplicate: () => void; onDelete: () => void }) {
+    useLocale();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     useEffect(() => {
@@ -30,14 +32,14 @@ export function CanvasNodeContextMenu({ menu, canCaptureVideoFrame, onClose, onC
         >
             {canCaptureVideoFrame ? (
                 <>
-                    <MenuButton icon={<BetweenHorizontalStart className="size-4" />} label="截取首帧" onClick={() => onCaptureVideoFrame("first")} />
-                    <MenuButton icon={<GalleryHorizontalEnd className="size-4" />} label="截取尾帧" onClick={() => onCaptureVideoFrame("last")} />
-                    <MenuButton icon={<GalleryHorizontal className="size-4" />} label="截取当前帧" onClick={() => onCaptureVideoFrame("current")} />
+                    <MenuButton icon={<BetweenHorizontalStart className="size-4" />} label={t("截取首帧")} onClick={() => onCaptureVideoFrame("first")} />
+                    <MenuButton icon={<GalleryHorizontalEnd className="size-4" />} label={t("截取尾帧")} onClick={() => onCaptureVideoFrame("last")} />
+                    <MenuButton icon={<GalleryHorizontal className="size-4" />} label={t("截取当前帧")} onClick={() => onCaptureVideoFrame("current")} />
                     <div className="my-1 border-t" style={{ borderColor: theme.toolbar.border }} />
                 </>
             ) : null}
-            {menu.type === "node" ? <MenuButton icon={<Plus className="size-4" />} label="复制" onClick={onDuplicate} /> : null}
-            <MenuButton icon={<Trash2 className="size-4" />} label="删除" onClick={onDelete} danger />
+            {menu.type === "node" ? <MenuButton icon={<Plus className="size-4" />} label={t("复制")} onClick={onDuplicate} /> : null}
+            <MenuButton icon={<Trash2 className="size-4" />} label={t("删除")} onClick={onDelete} danger />
         </div>
     );
 }

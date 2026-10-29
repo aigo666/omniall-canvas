@@ -15,6 +15,7 @@ import { tokenDanceRecoveryMessage } from "./protocols/tokendance";
 import type { ReferenceImage } from "@/types/image";
 import { nanoid } from "nanoid";
 
+import { t } from "@/i18n";
 export type ChatCompletionMessage = {
     role: "system" | "user" | "assistant";
     content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
@@ -259,7 +260,7 @@ function resolveImageDataUrl(item: Record<string, unknown>, mime: string) {
 
 function parseImagePayload(payload: ImageApiResponse, mime: string): GeneratedImage[] {
     if (typeof payload.code === "number" && payload.code !== 0) {
-        throw new ImageRequestError(payload.msg || "请求失败", payload);
+        throw new ImageRequestError(payload.msg || t("请求失败"), payload);
     }
     const images =
         payload.data
@@ -275,7 +276,7 @@ function parseImagePayload(payload: ImageApiResponse, mime: string): GeneratedIm
 }
 
 function parseChatImagesPayload(payload: ChatImagesApiResponse): GeneratedImage[] {
-    if (typeof payload.code === "number" && payload.code !== 0) throw new ImageRequestError(payload.msg || "请求失败", payload);
+    if (typeof payload.code === "number" && payload.code !== 0) throw new ImageRequestError(payload.msg || t("请求失败"), payload);
     if (payload.error?.message) throw new ImageRequestError(payload.error.message, payload);
     const images = payload.choices
         ?.flatMap((choice) => choice.message?.images || [])
@@ -314,7 +315,7 @@ function collectResponsesImageBase64(item: Record<string, unknown>) {
 
 function parseResponsesPayload(payload: ResponsesApiResponse, mime: string): GeneratedImage[] {
     if (typeof payload.code === "number" && payload.code !== 0) {
-        throw new ImageRequestError(payload.msg || "请求失败", payload);
+        throw new ImageRequestError(payload.msg || t("请求失败"), payload);
     }
     const images =
         payload.output
@@ -364,7 +365,7 @@ function formatErrorDetail(detail: unknown) {
 }
 
 function timeoutError(timeoutSeconds: number) {
-    return `请求超时：超过 ${timeoutSeconds} 秒仍未完成，请稍后重试。`;
+    return t("请求超时：超过 {timeoutSeconds} 秒仍未完成，请稍后重试。", { timeoutSeconds });
 }
 
 async function withTimeout<T>(timeoutSeconds: number, externalSignal: AbortSignal | undefined, run: (signal: AbortSignal) => Promise<T>) {
@@ -403,7 +404,7 @@ async function requestWithTransientRetry(run: () => Promise<Response>, retries =
         }
         await new Promise((resolve) => window.setTimeout(resolve, retryDelay(attempt + 1)));
     }
-    throw lastError instanceof Error ? lastError : new Error("请求失败");
+    throw lastError instanceof Error ? lastError : new Error(t("请求失败"));
 }
 
 function parseServerSentEventBlock(block: string) {
@@ -429,7 +430,7 @@ export async function readJsonServerSentEvents(response: Response, onEvent: (eve
         try {
             event = parseServerSentEventBlock(block);
         } catch (error) {
-            throw new ImageRequestError(error instanceof Error ? error.message : "流式响应解析失败", block);
+            throw new ImageRequestError(error instanceof Error ? error.message : t("流式响应解析失败"), block);
         }
         if (!event) return;
         events.push(event);
@@ -503,7 +504,7 @@ async function parseResponsesStreamResponse(response: Response, mime: string): P
         return parseResponsesPayload(completedPayload || { output }, mime);
     } catch (error) {
         if (!partialImages.length) {
-            throw new ImageRequestError(error instanceof Error ? error.message : "Responses API 没有返回图片", {
+            throw new ImageRequestError(error instanceof Error ? error.message : t("Responses API 没有返回图片"), {
                 completedPayload,
                 output,
                 events,
@@ -536,7 +537,7 @@ export function aiApiUrl(config: AiConfig, path: string) {
 
 export function aiHeaders(config: AiConfig, contentType?: string) {
     const token = useUserStore.getState().token;
-    if (config.channelMode === "remote" && !token) throw new Error("请先登录后再使用云端渠道");
+    if (config.channelMode === "remote" && !token) throw new Error(t("请先登录后再使用云端渠道"));
     if (config.channelMode === "remote") {
         return {
             Authorization: `Bearer ${token}`,
@@ -577,7 +578,7 @@ async function writeLocalAICallLog(config: AiConfig, endpoint: string, startedAt
             method: "POST",
             model: config.model,
             channelId: channel?.id || config.activeChannelId || "",
-            channelName: channel?.name || "本地直连",
+            channelName: channel?.name || t("本地直连"),
             status,
             durationMs: Date.now() - startedAt,
             credits: 0,
@@ -948,7 +949,7 @@ async function requestAndParseImages(config: AiConfig, endpoint: string, request
         return parsed.images;
     } catch (error) {
         if (!logged) {
-            void writeLocalAICallLog(config, endpoint, startedAt, 0, timeoutSeconds, stringifyLogPayload(requestBody), "", error instanceof ImageRequestError ? error.detail || error.message : error instanceof Error ? error.message : "请求失败");
+            void writeLocalAICallLog(config, endpoint, startedAt, 0, timeoutSeconds, stringifyLogPayload(requestBody), "", error instanceof ImageRequestError ? error.detail || error.message : error instanceof Error ? error.message : t("请求失败"));
         }
         throw error;
     }
@@ -970,7 +971,7 @@ async function requestImages(config: AiConfig & { seedIndex?: number; seedCount?
         const images = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
         if (images.length) return images;
         const firstError = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
-        throw firstError?.reason || new Error("所有并发请求均失败");
+        throw firstError?.reason || new Error(t("所有并发请求均失败"));
     }
     if (references.length && isAgnesImageModel(config.model)) {
         return requestAgnesImageEdit(config, prompt, references, params);
@@ -1019,7 +1020,7 @@ export async function requestGeneration(config: AiConfig & { seedIndex?: number;
         return syncGeneratedImages(images);
     } catch (error) {
         if (error instanceof ImageRequestError) throw error;
-        throw new Error(error instanceof Error ? error.message : "请求失败");
+        throw new Error(error instanceof Error ? error.message : t("请求失败"));
     }
 }
 
@@ -1030,7 +1031,7 @@ export async function requestEdit(config: AiConfig & { seedIndex?: number; seedC
         return syncGeneratedImages(images);
     } catch (error) {
         if (error instanceof ImageRequestError) throw error;
-        throw new Error(error instanceof Error ? error.message : "请求失败");
+        throw new Error(error instanceof Error ? error.message : t("请求失败"));
     }
 }
 
@@ -1040,7 +1041,7 @@ export async function createCanvasImageTask(config: AiConfig & { seedIndex?: num
         const images = await requestImages({ ...config, count: "1" }, prompt, references, options.signal);
         options.signal?.throwIfAborted();
         const [image] = images;
-        if (!image) throw new Error("接口没有返回图片");
+        if (!image) throw new Error(t("接口没有返回图片"));
         return syncCanvasImageTask({
             id: options.clientTaskId || nanoid(),
             source: options.source || "canvas",
@@ -1064,14 +1065,14 @@ export async function createCanvasImageTask(config: AiConfig & { seedIndex?: num
         throw new ImageRequestError(error.message, error.detail);
     }
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasImageTask };
-    if (payload.code !== 0 || !payload.data) throw new ImageRequestError(payload.msg || "图片任务创建失败", payload);
+    if (payload.code !== 0 || !payload.data) throw new ImageRequestError(payload.msg || t("图片任务创建失败"), payload);
     refreshRemoteUser(config);
     return syncCanvasImageTask(payload.data);
 }
 
 export async function pollCanvasImageTaskStatus(taskId: string, signal?: AbortSignal): Promise<CanvasImageTask> {
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录后再使用云端渠道");
+    if (!token) throw new Error(t("请先登录后再使用云端渠道"));
     const response = await fetch(`/api/v1/canvas/image-tasks/${encodeURIComponent(taskId)}`, {
         signal,
         headers: { Authorization: `Bearer ${token}` },
@@ -1081,7 +1082,7 @@ export async function pollCanvasImageTaskStatus(taskId: string, signal?: AbortSi
         throw new ImageRequestError(error.message, error.detail);
     }
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasImageTask };
-    if (payload.code !== 0 || !payload.data) throw new ImageRequestError(payload.msg || "读取图片任务失败", payload);
+    if (payload.code !== 0 || !payload.data) throw new ImageRequestError(payload.msg || t("读取图片任务失败"), payload);
     return syncCanvasImageTask(payload.data);
 }
 
@@ -1238,7 +1239,7 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
                 choices?: Array<{ message?: { content?: string | null } }>;
                 data?: { choices?: Array<{ message?: { content?: string | null } }> };
             };
-            if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "请求失败");
+            if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || t("请求失败"));
             const content = payload.choices?.[0]?.message?.content || payload.data?.choices?.[0]?.message?.content || "";
             if (!content && payload.error?.message) throw new Error(payload.error.message);
             if (content) {
@@ -1250,7 +1251,7 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
         throw new Error(readAxiosError(error, "请求失败"));
     }
     refreshRemoteUser(config);
-    return answer || "没有返回内容";
+    return answer || t("没有返回内容");
 }
 
 export async function fetchImageModels(config: AiConfig) {
@@ -1402,7 +1403,7 @@ async function requestGeminiText(config: AiConfig, messages: ChatCompletionMessa
         }
     });
     refreshRemoteUser(config);
-    return answer || "没有返回内容";
+    return answer || t("没有返回内容");
 }
 
 async function createGeminiTextBody(config: AiConfig, messages: ChatCompletionMessage[]) {
@@ -1440,7 +1441,7 @@ async function fetchGeminiModels(baseUrl: string, apiKey: string) {
         }
         pageToken = payload.nextPageToken || "";
     } while (pageToken);
-    if (!result.length) throw new Error("Gemini 模型列表为空");
+    if (!result.length) throw new Error(t("Gemini 模型列表为空"));
     return Array.from(new Set(result)).sort((a, b) => a.localeCompare(b));
 }
 
@@ -1562,7 +1563,7 @@ export async function listCanvasImageTasks(config: AiConfig, sources: Array<"ima
         throw new ImageRequestError(error.message, error.detail);
     }
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasImageTask[] };
-    if (payload.code !== 0 || !Array.isArray(payload.data)) throw new ImageRequestError(payload.msg || "读取图片任务失败", payload);
+    if (payload.code !== 0 || !Array.isArray(payload.data)) throw new ImageRequestError(payload.msg || t("读取图片任务失败"), payload);
     return payload.data;
 }
 
@@ -1579,7 +1580,7 @@ export async function batchCanvasImageTaskStatus(config: AiConfig, ids: string[]
         throw new ImageRequestError(error.message, error.detail);
     }
     const payload = (await response.json()) as { code?: number; msg?: string; data?: CanvasImageTask[] };
-    if (payload.code !== 0 || !Array.isArray(payload.data)) throw new ImageRequestError(payload.msg || "读取图片任务失败", payload);
+    if (payload.code !== 0 || !Array.isArray(payload.data)) throw new ImageRequestError(payload.msg || t("读取图片任务失败"), payload);
     return Promise.all(payload.data.map((task) => syncCanvasImageTask(task)));
 }
 
@@ -1594,5 +1595,5 @@ export async function deleteCanvasImageTask(config: AiConfig, task?: CanvasImage
         throw new ImageRequestError(error.message, error.detail);
     }
     const payload = (await response.json()) as { code?: number; msg?: string };
-    if (payload.code !== 0) throw new ImageRequestError(payload.msg || "删除图片任务失败", payload);
+    if (payload.code !== 0) throw new ImageRequestError(payload.msg || t("删除图片任务失败"), payload);
 }

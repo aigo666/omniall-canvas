@@ -1,0 +1,79 @@
+{
+  "name": "omniall-canvas-desktop",
+  "productName": "OmniAll Canvas",
+  "version": "0.8.2",
+  "private": true,
+  "description": "OmniAll Canvas desktop client — local UI, remote API",
+  "main": "src/main.cjs",
+  "author": "OmniAll",
+  "scripts": {
+    "start": "electron .",
+    "pack:dir": "electron-builder --dir",
+    "pack:dmg": "electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "ai.omniall.canvas",
+    "productName": "OmniAll Canvas",
+    "copyright": "Copyright © OmniAll",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/web",
+        "to": "web",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/agent",
+        "to": "agent",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/config.json",
+        "to": "config.json"
+      }
+    ],
+    "afterPack": "./scripts/after-pack.cjs",
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "OmniAll Canvas",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "35.2.1",
+    "electron-builder": "26.0.12"
+  }
+}

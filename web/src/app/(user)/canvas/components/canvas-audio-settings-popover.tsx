@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Settings2 } from "lucide-react";
@@ -100,14 +101,14 @@ function AudioSettingsPortal({ buttonRect, panelRef, placement, theme, config, o
     return createPortal(
         <div ref={panelRef} className="canvas-image-settings-popover" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             <div className="space-y-4">
-                <div className="text-lg font-semibold">音频设置</div>
+                <div className="text-lg font-semibold">{t("音频设置")}</div>
                 {isMimoVoiceCloneModel(model) || isAutoDLConfig(config, model) ? (
                     <ResourceSinglePicker
-                        label="参考音频"
+                        label={t("参考音频")}
                         value={cloneAudioNodeId}
                         options={audioOptions}
-                        placeholder="请选择音频节点"
-                        emptyText={audioOptions.length ? "请选择已连接音频" : "暂无已连接音频节点"}
+                        placeholder={t("请选择音频节点")}
+                        emptyText={audioOptions.length ? t("请选择已连接音频") : t("暂无已连接音频节点")}
                         theme={theme}
                         onChange={(value) => onMetadataChange?.(isAutoDLConfig(config, model) ? { referenceAudioNodeId: value || undefined } : { mimoVoiceCloneAudioNodeId: value || undefined })}
                     />
@@ -132,7 +133,7 @@ function audioSettingsSummary(config: AiConfig, cloneAudioNodeId: string, audioO
     if (!isMimoTtsModel(model)) return `${audioVoiceLabel(config.audioVoice)} · ${audioFormatLabel(config.audioFormat)} · ${audioSpeedLabel(config.audioSpeed)}`;
     const format = normalizeMimoTtsFormat(config.mimoTtsFormat).toUpperCase();
     if (isMimoPresetTtsModel(model)) return `${mimoTtsVoiceLabel(config.mimoTtsVoice)} · ${format}`;
-    if (isMimoVoiceDesignModel(model)) return `音色设计 · ${format}`;
-    if (isMimoVoiceCloneModel(model)) return `${audioOptions.find((item) => item.nodeId === cloneAudioNodeId)?.label || "参考音频"} · ${format}`;
+    if (isMimoVoiceDesignModel(model)) return t("音色设计 · {format}", { format });
+    if (isMimoVoiceCloneModel(model)) return `${audioOptions.find((item) => item.nodeId === cloneAudioNodeId)?.label || t("参考音频")} · ${format}`;
     return format;
 }

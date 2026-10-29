@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Button, Input, Modal, Slider } from "antd";
 import { Brush, Eraser, RotateCcw, WandSparkles, X } from "lucide-react";
@@ -121,14 +122,14 @@ export function CanvasNodeMaskEditDialog({
     const submit = async () => {
         const nextPrompt = prompt.trim();
         const canvas = maskCanvasRef.current;
-        if (!nextPrompt) return setError("请输入修改要求");
+        if (!nextPrompt) return setError(t("请输入修改要求"));
         if (!canvas) return;
-        if (!canvasHasPaint(canvas)) return setError("请先涂抹局部区域");
+        if (!canvasHasPaint(canvas)) return setError(t("请先涂抹局部区域"));
         setSubmitting(true);
         try {
             onConfirm({ prompt: nextPrompt, markedDataUrl: await buildMarkedReference(dataUrl, canvas), model, channelId });
         } catch {
-            setError("生成标记参考图失败");
+            setError(t("生成标记参考图失败"));
         } finally {
             setSubmitting(false);
         }
@@ -160,34 +161,36 @@ export function CanvasNodeMaskEditDialog({
 
                 <div className="flex min-h-[360px] flex-col gap-5">
                     <div>
-                        <h2 className="text-xl font-semibold">局部遮罩编辑</h2>
-                        <div className="mt-2 text-sm opacity-60">{image ? `${image.width} x ${image.height}px` : "读取中"}</div>
+                        <h2 className="text-xl font-semibold">{t("局部遮罩编辑")}</h2>
+                        <div className="mt-2 text-sm opacity-60">{image ? `${image.width} x ${image.height}px` : t("读取中")}</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                         <Button type={mode === "paint" ? "primary" : "default"} icon={<Brush className="size-4" />} onClick={() => setMode("paint")}>
-                            画笔
+                            
+                            {t("画笔")}
                         </Button>
                         <Button type={mode === "erase" ? "primary" : "default"} icon={<Eraser className="size-4" />} onClick={() => setMode("erase")}>
-                            擦除
+                            
+                            {t("擦除")}
                         </Button>
                     </div>
 
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium opacity-75">笔刷大小</span>
+                            <span className="font-medium opacity-75">{t("笔刷大小")}</span>
                             <span className="font-semibold">{brushSize}px</span>
                         </div>
                         <Slider min={8} max={160} step={2} value={brushSize} onChange={setBrushSize} />
                     </div>
 
                     <div className="space-y-2">
-                        <div className="text-sm font-medium opacity-75">修改要求</div>
+                        <div className="text-sm font-medium opacity-75">{t("修改要求")}</div>
                         <Input.TextArea
                             rows={6}
                             value={prompt}
                             status={error && !prompt.trim() ? "error" : undefined}
-                            placeholder="例如：把选中区域改成金属材质，保持原图光影"
+                            placeholder={t("例如：把选中区域改成金属材质，保持原图光影")}
                             onChange={(event) => {
                                 setPrompt(event.target.value);
                                 setError("");
@@ -197,20 +200,23 @@ export function CanvasNodeMaskEditDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <div className="text-sm font-medium opacity-75">模型</div>
+                        <div className="text-sm font-medium opacity-75">{t("模型")}</div>
                         <ModelPicker className="canvas-compact-control h-10" config={{ ...config, model, imageChannelId: channelId || config.imageChannelId }} value={model} channelId={channelId || config.imageChannelId} onChange={onModelChange} capability="image" onMissingConfig={onMissingConfig} fullWidth />
                     </div>
 
                     <div className="mt-auto flex items-center justify-between gap-2">
                         <Button icon={<RotateCcw className="size-4" />} onClick={resetMask} disabled={submitting}>
-                            重置
+                            
+                            {t("重置")}
                         </Button>
                         <div className="flex items-center gap-2">
                             <Button icon={<X className="size-4" />} onClick={onClose} disabled={submitting}>
-                                取消
+                                
+                                {t("取消")}
                             </Button>
                             <Button type="primary" icon={<WandSparkles className="size-4" />} onClick={submit} loading={submitting} disabled={submitting}>
-                                AI 修改
+                                
+                                {t("AI 修改")}
                             </Button>
                         </div>
                     </div>
@@ -322,7 +328,7 @@ async function toDrawableDataUrl(src: string) {
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("读取图片失败"));
+        reader.onerror = () => reject(new Error(t("读取图片失败")));
         reader.readAsDataURL(blob);
     });
 }
@@ -331,7 +337,7 @@ function loadCanvasImage(src: string) {
     return new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error("读取图片失败"));
+        image.onerror = () => reject(new Error(t("读取图片失败")));
         image.src = src;
     });
 }

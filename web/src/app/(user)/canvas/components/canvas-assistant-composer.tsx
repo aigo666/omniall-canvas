@@ -1,7 +1,8 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useMemo, type ReactNode } from "react";
-import { ArrowUp, Brain, FolderOpen, ImageIcon, Menu, Square, Upload, Video } from "lucide-react";
+import { ArrowUp, Brain, FolderOpen, ImageIcon, Plus, Square, Upload, Video } from "lucide-react";
 import { Button, Dropdown } from "antd";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -12,11 +13,15 @@ import type { CanvasResourceReference } from "../utils/canvas-resource-reference
 import { CanvasAgentSkillPopover } from "./canvas-agent-skill-popover";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasPromptChipInput } from "./canvas-prompt-chip-input";
+import { CanvasPromptPopover } from "./canvas-prompt-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 
 export type CanvasAssistantComposerProps = {
     prompt: string;
     isRunning: boolean;
+    size?: "default" | "large";
+    showPromptLibrary?: boolean;
+    placeholders?: string[];
     codexControls?: ReactNode;
     references: CanvasAssistantReference[];
     availableReferences?: CanvasResourceReference[];
@@ -38,6 +43,9 @@ export type CanvasAssistantComposerProps = {
 export function CanvasAssistantComposer({
     prompt,
     isRunning,
+    size = "default",
+    showPromptLibrary = false,
+    placeholders,
     codexControls,
     references,
     availableReferences,
@@ -71,8 +79,8 @@ export function CanvasAssistantComposer({
     const submit = (nextPrompt = prompt, referenceIds = references.map((reference) => reference.id)) => onSubmit(nextPrompt, referenceIds);
 
     return (
-        <div className="px-2 pb-2" onWheelCapture={(event) => event.stopPropagation()}>
-            <div className="rounded-2xl border px-3 pb-3 pt-3" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke }}>
+        <div className={size === "large" ? "px-1 pb-1" : "px-2 pb-2"} onWheelCapture={(event) => event.stopPropagation()}>
+            <div className={size === "large" ? "rounded-2xl border px-4 pb-4 pt-4" : "rounded-2xl border px-3 pb-3 pt-3"} style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke }}>
                 <CanvasPromptChipInput
                     value={prompt}
                     references={promptReferences}
@@ -83,9 +91,10 @@ export function CanvasAssistantComposer({
                     onReferenceIdsChange={onReferenceIdsChange}
                     onPasteImage={onPasteImage}
                     onSubmit={submit}
-                    className="thin-scrollbar min-h-20 max-h-[220px] w-full px-1 py-0 text-sm leading-5"
+                    className={size === "large" ? "thin-scrollbar min-h-36 max-h-[360px] w-full px-1 py-0 text-sm leading-6" : "thin-scrollbar min-h-20 max-h-[220px] w-full px-1 py-0 text-sm leading-5"}
                     style={{ color: theme.node.text }}
-                    placeholder="描述创作目标，或让我继续操作画布"
+                    placeholder={t("描述创作目标，或让我继续操作画布")}
+                    placeholders={placeholders}
                     placeholderClassName="!left-1 !top-0"
                 />
                 <div className="@container mt-2 flex items-center justify-between gap-2">
@@ -94,15 +103,16 @@ export function CanvasAssistantComposer({
                             trigger={["click"]}
                             menu={{
                                 items: [
-                                    { key: "upload", icon: <Upload className="size-4" />, label: "上传文件" },
-                                    { key: "assets", icon: <FolderOpen className="size-4" />, label: "我的素材" },
+                                    { key: "upload", icon: <Upload className="size-4" />, label: t("上传文件") },
+                                    { key: "assets", icon: <FolderOpen className="size-4" />, label: t("我的素材") },
                                 ],
                                 onClick: ({ key }) => (key === "upload" ? onOpenUpload() : onOpenAssets()),
                             }}
                         >
-                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={{ color: theme.node.text }} icon={<Menu className="size-4" />} aria-label="添加素材" />
+                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={{ color: theme.node.text }} icon={<Plus className="size-4" />} aria-label={t("添加素材")} />
                         </Dropdown>
                         {onSkillSelect && onSkillRemove ? <CanvasAgentSkillPopover selectedSkills={selectedSkills} onSelect={onSkillSelect} onDeleteSelected={onSkillRemove} /> : null}
+                        {showPromptLibrary ? <CanvasPromptPopover onSelect={onPromptChange} /> : null}
                         {codexControls}
                         <CanvasImageSettingsPopover
                             config={imageConfig}
@@ -135,8 +145,8 @@ export function CanvasAssistantComposer({
                             className="!h-8 !w-8 !min-w-8"
                             style={{ color: theme.node.text, background: reasoningEnabled ? theme.toolbar.activeBg : undefined }}
                             icon={<Brain className="size-4" />}
-                            title={reasoningEnabled ? "推理已开启" : "推理已关闭"}
-                            aria-label={reasoningEnabled ? "关闭推理" : "开启推理"}
+                            title={reasoningEnabled ? t("推理已开启") : t("推理已关闭")}
+                            aria-label={reasoningEnabled ? t("关闭推理") : t("开启推理")}
                             aria-pressed={reasoningEnabled}
                             onClick={() => onAgentConfigChange({ textReasoningEnabled: !reasoningEnabled })}
                         />
@@ -147,7 +157,7 @@ export function CanvasAssistantComposer({
                             className="!size-10 !min-w-10"
                             disabled={!isRunning && !prompt.trim()}
                             onClick={() => (isRunning ? onStop?.() : void submit())}
-                            aria-label={isRunning ? "停止" : "发送"}
+                            aria-label={isRunning ? t("停止") : t("发送")}
                             icon={isRunning ? <Square className="size-4 fill-current" /> : <ArrowUp className="size-4" />}
                         />
                     </div>

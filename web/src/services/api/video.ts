@@ -20,6 +20,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
+import { t } from "@/i18n";
 export type VideoResponse = { parameter_translation?: boolean; translationSnapshot?: LocalVideoTranslationSnapshot; id: string; task_id?: string; video_id?: string; source_id?: string; sourceId?: string; channelId?: string; userChannelId?: string; channelName?: string; workflowRef?: string; channel_id?: string; user_channel_id?: string; channel_name?: string; status?: string; video_url?: string; url?: string; storageKey?: string; progress?: number; error?: { message?: string }; size?: string; seconds?: string; model?: string; created_at?: string | number; createdAt?: string | number; started_at?: string | number; startedAt?: string | number; request_body?: string };
 type ApiVideoEnvelope = { code: number; data?: VideoResponse | VideoResponse[] | null; msg?: string; message?: string };
 type ApiVideoResponse = VideoResponse | ApiVideoEnvelope;
@@ -85,7 +86,7 @@ function agnesBaseUrl(baseUrl: string) {
 
 function aiHeaders(config: AiConfig) {
     const token = useUserStore.getState().token;
-    if (config.channelMode === "remote" && !token) throw new Error("请先登录后再使用云端渠道");
+    if (config.channelMode === "remote" && !token) throw new Error(t("请先登录后再使用云端渠道"));
     if (config.channelMode === "remote") return { Authorization: `Bearer ${token}`, ...(channelIdForActiveModel(config) ? { "X-Model-Channel-ID": channelIdForActiveModel(config) } : {}) };
     if (token) return { Authorization: `Bearer ${token}`, ...(channelIdForActiveModel(config) ? { "X-User-Model-Channel-ID": channelIdForActiveModel(config) } : {}) };
     if (isGeminiConfig(config)) return geminiDirectHeaders(config);
@@ -139,7 +140,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         const created = directProvider
             ? await (await import("@/services/api/direct-ai")).createDirectVideoTask(config, directProvider, body, createOptions.signal)
             : unwrapVideoResponseForConfig(config, model, (await axios.post<ApiVideoResponse>(createUrl, requestBody, { headers, signal: accountProxy ? undefined : createOptions.signal })).data);
-        if (!created.id && !created.video_id) throw new Error("视频接口没有返回任务 ID");
+        if (!created.id && !created.video_id) throw new Error(t("视频接口没有返回任务 ID"));
         refreshRemoteUser(config);
         const task = await syncGeneratedVideo(created, config);
         if (typeof task.progress === "number") onProgress?.(task.progress, task);
@@ -262,7 +263,7 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
             const polled: VideoResponse = await pollOnce();
             const video = polled.parameter_translation ? await syncGeneratedVideo(polled, config, true) : await cacheProtectedVideo(config, model, await cacheProtectedGeminiVideo(config, model, polled));
             onPoll?.(video);
-            if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || "视频生成失败", video);
+            if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || t("视频生成失败"), video);
             if (typeof video.progress === "number") onProgress?.(video.progress, video);
             if (isCompletedVideoStatus(video.status) || video.video_url || video.url) {
                 completed = video;
@@ -318,7 +319,7 @@ async function syncGeneratedVideo(task: VideoResponse, config: AiConfig, content
 export async function listVideoGenerationTasks(config: AiConfig) {
     if (!usesAccountProxy(config)) return [];
     const payload = (await axios.get<ApiVideoEnvelope>("/api/v1/video-tasks", { headers: aiHeaders(config) })).data;
-    if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || "读取视频任务失败", payload);
+    if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || t("读取视频任务失败"), payload);
     return Array.isArray(payload.data) ? payload.data.map(normalizeVideoResponse) : [];
 }
 
@@ -327,7 +328,7 @@ export async function deleteVideoGenerationTask(config: AiConfig, task?: VideoRe
     const id = task.id || task.task_id || task.video_id;
     if (!id) return;
     const payload = (await axios.delete<ApiVideoEnvelope>(`/api/v1/video-tasks/${encodeURIComponent(id)}`, { headers: aiHeaders(config) })).data;
-    if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || "删除视频任务失败", payload);
+    if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || t("删除视频任务失败"), payload);
 }
 
 function isGrok2APIVideoConfig(config: AiConfig, model: string) {
@@ -870,10 +871,10 @@ function normalizeVideoResolution(value: string) {
 }
 
 function unwrapVideoResponse(payload: ApiVideoResponse): VideoResponse {
-    if (!payload) throw new Error("接口没有返回视频任务");
+    if (!payload) throw new Error(t("接口没有返回视频任务"));
     if (isVideoEnvelope(payload)) {
-        if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || "请求失败", payload);
-        if (!payload.data || Array.isArray(payload.data)) throw new Error("接口没有返回视频任务");
+        if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || t("请求失败"), payload);
+        if (!payload.data || Array.isArray(payload.data)) throw new Error(t("接口没有返回视频任务"));
         return normalizeVideoResponse(payload.data);
     }
     const error = videoPayloadErrorMessage(payload);
@@ -947,7 +948,7 @@ function normalizeGeminiVideoResponse(payload: ApiVideoResponse): VideoResponse 
         status: Object.keys(error).length ? "failed" : done && videoUrl ? "completed" : done ? "failed" : "processing",
         progress: done ? 100 : 0,
         video_url: videoUrl,
-        error: Object.keys(error).length ? { message: geminiErrorMessage(root, "视频生成失败") } : done && !videoUrl ? { message: "Gemini Veo 任务完成但没有返回视频地址" } : undefined,
+        error: Object.keys(error).length ? { message: geminiErrorMessage(root, "视频生成失败") } : done && !videoUrl ? { message: t("Gemini Veo 任务完成但没有返回视频地址") } : undefined,
     });
 }
 
@@ -1011,7 +1012,7 @@ async function writeVideoAICallLog(config: AiConfig, model: string, endpoint: st
             method,
             model,
             channelId: channel?.id || config.activeChannelId || "",
-            channelName: channel?.name || "本地直连",
+            channelName: channel?.name || t("本地直连"),
             status,
             durationMs: Date.now() - startedAt,
             credits: 0,
@@ -1123,7 +1124,7 @@ function isFailedVideoStatus(status?: string) {
 
 function videoPayloadErrorMessage(value: unknown): string {
     const record = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
-    if (typeof record.code === "number" && record.code !== 0) return firstString(record.msg, record.message, nestedMessage(record.error)) || "视频下载失败";
+    if (typeof record.code === "number" && record.code !== 0) return firstString(record.msg, record.message, nestedMessage(record.error)) || t("视频下载失败");
     if (typeof record.code === "string" && /fail|error/i.test(record.code)) return firstString(nestedMessage(record.error), record.msg, record.message, record.code);
     return firstString(nestedMessage(record.error));
 }
@@ -1181,7 +1182,7 @@ export type { VideoGenerationResult as VideoGenerationTask };
 export async function pollVideoGenerationTask(taskId: string): Promise<VideoResponse> {
     const config = { channelMode: "remote" as const, model: "", videoModel: "" } as AiConfig;
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录");
+    if (!token) throw new Error(t("请先登录"));
     const response = await axios.get<ApiVideoEnvelope>(aiApiUrl(config, `/videos/${encodeURIComponent(taskId)}?model=`), { headers: { Authorization: `Bearer ${token}` } });
     return unwrapVideoResponse(response.data);
 }

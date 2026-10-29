@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Camera, ChevronDown, ChevronUp, X } from "lucide-react";
@@ -125,7 +126,8 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                     aria-expanded={open}
                     onClick={() => setOpen((current) => !current)}
                 >
-                    摄像机
+                    
+                    {t("摄像机")}
                 </Button>
             </span>
 
@@ -140,8 +142,8 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                           onWheel={(event) => event.stopPropagation()}
                       >
                           <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: theme.toolbar.border }}>
-                              <h2 className="text-base font-semibold">摄像机</h2>
-                              <button type="button" className="grid size-8 place-items-center rounded-lg transition hover:opacity-70" style={{ color: theme.node.muted }} aria-label="关闭" onClick={() => setOpen(false)}>
+                              <h2 className="text-base font-semibold">{t("摄像机")}</h2>
+                              <button type="button" className="grid size-8 place-items-center rounded-lg transition hover:opacity-70" style={{ color: theme.node.muted }} aria-label={t("关闭")} onClick={() => setOpen(false)}>
                                   <X className="size-5" />
                               </button>
                           </div>
@@ -151,7 +153,7 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                                   <div className="grid min-w-[840px] grid-cols-4">
                                       <SettingColumn
                                           theme={theme}
-                                          label="相机"
+                                          label={t("相机")}
                                           tooltipTitle={camera.zhName + " · " + camera.label}
                                           tooltipDesc={camera.description}
                                           tooltipUseCase={camera.useCase}
@@ -163,7 +165,7 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                                       <SettingColumn
                                           theme={theme}
                                           separator
-                                          label="镜头"
+                                          label={t("镜头")}
                                           tooltipTitle={lens.zhName + " · " + lens.label}
                                           tooltipDesc={lens.description}
                                           tooltipUseCase={lens.useCase}
@@ -175,7 +177,7 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                                       <SettingColumn
                                           theme={theme}
                                           separator
-                                          label="焦距"
+                                          label={t("焦距")}
                                           tooltipTitle={cameraControl.focalLength + "mm · " + (focalMeta?.zhName || "")}
                                           tooltipDesc={focalMeta?.description}
                                           tooltipUseCase={focalMeta?.useCase}
@@ -193,7 +195,7 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                                       <SettingColumn
                                           theme={theme}
                                           separator
-                                          label="光圈"
+                                          label={t("光圈")}
                                           tooltipTitle={"f/" + cameraControl.aperture + " · " + (apertureMeta?.zhName || "")}
                                           tooltipDesc={apertureMeta?.description}
                                           tooltipUseCase={apertureMeta?.useCase}
@@ -212,8 +214,8 @@ export function CanvasCameraControl({ value, onChange, buttonClassName }: Canvas
                               </div>
 
                               <div className="mt-6 flex items-center justify-end gap-2">
-                                  <span className="text-sm" style={{ color: cameraControl.enabled ? theme.node.text : theme.node.muted }}>{cameraControl.enabled ? "开启" : "关闭"}</span>
-                                  <Switch size="small" checked={cameraControl.enabled} aria-label="摄像机控制" onChange={(enabled) => updateCameraControl({ enabled })} />
+                                  <span className="text-sm" style={{ color: cameraControl.enabled ? theme.node.text : theme.node.muted }}>{cameraControl.enabled ? t("开启") : t("关闭")}</span>
+                                  <Switch size="small" checked={cameraControl.enabled} aria-label={t("摄像机控制")} onChange={(enabled) => updateCameraControl({ enabled })} />
                               </div>
                           </div>
                       </div>,
@@ -243,13 +245,13 @@ function SettingColumn({ theme, separator, label, tooltipTitle, tooltipDesc, too
         <div className="max-w-64">
             <div className="font-medium">{tooltipTitle}</div>
             {tooltipDesc ? <div className="mt-1 text-xs opacity-80">{tooltipDesc}</div> : null}
-            {tooltipUseCase ? <div className="mt-2 text-xs opacity-70">使用场景：{tooltipUseCase}</div> : null}
+            {tooltipUseCase ? <div className="mt-2 text-xs opacity-70">{t("使用场景：")}{tooltipUseCase}</div> : null}
         </div>
     );
 
     return (
         <div className="flex flex-col items-center px-5" style={{ borderLeft: separator ? "1px solid " + theme.node.stroke : undefined }}>
-            <Button type="text" disabled={!onPrevious} className="group !h-8 !w-full !p-0 hover:!bg-transparent" style={{ color: theme.node.faint }} icon={<ChevronUp className="h-5 w-8 rounded-md p-0.5 transition-colors group-hover:bg-foreground/5 group-hover:text-foreground/80" />} aria-label={"上一项" + label} onClick={onPrevious} />
+            <Button type="text" disabled={!onPrevious} className="group !h-8 !w-full !p-0 hover:!bg-transparent" style={{ color: theme.node.faint }} icon={<ChevronUp className="h-5 w-8 rounded-md p-0.5 transition-colors group-hover:bg-foreground/5 group-hover:text-foreground/80" />} aria-label={t("上一项") + label} onClick={onPrevious} />
             <Tooltip title={tooltip} mouseEnterDelay={0.7} color={theme.node.panel} zIndex={1300}>
                 <div className="relative flex h-[180px] w-full max-w-[180px] cursor-help flex-col items-center justify-between rounded-2xl border px-4 py-3 transition-colors" style={{ background: theme.node.fill, borderColor: theme.node.stroke }}>
                     <span className="text-sm font-medium" style={{ color: theme.node.muted }}>{label}</span>
@@ -257,7 +259,7 @@ function SettingColumn({ theme, separator, label, tooltipTitle, tooltipDesc, too
                     {badge ? <span className="absolute right-2 top-2.5 rounded-md px-2 py-0.5 text-xs font-medium" style={{ background: theme.toolbar.activeBg, color: theme.toolbar.activeText }}>{badge}</span> : null}
                 </div>
             </Tooltip>
-            <Button type="text" disabled={!onNext} className="group !h-8 !w-full !p-0 hover:!bg-transparent" style={{ color: theme.node.faint }} icon={<ChevronDown className="h-5 w-8 rounded-md p-0.5 transition-colors group-hover:bg-foreground/5 group-hover:text-foreground/80" />} aria-label={"下一项" + label} onClick={onNext} />
+            <Button type="text" disabled={!onNext} className="group !h-8 !w-full !p-0 hover:!bg-transparent" style={{ color: theme.node.faint }} icon={<ChevronDown className="h-5 w-8 rounded-md p-0.5 transition-colors group-hover:bg-foreground/5 group-hover:text-foreground/80" />} aria-label={t("下一项") + label} onClick={onNext} />
             <span className="max-w-full truncate text-center text-sm" style={{ color: theme.node.muted }}>{caption}</span>
         </div>
     );

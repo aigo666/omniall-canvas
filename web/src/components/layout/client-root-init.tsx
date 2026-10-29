@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -8,7 +9,8 @@ import { App } from "antd";
 import { fetchUserConfig } from "@/services/api/user-config";
 import { replaceWorkflowChannels } from "@/services/workflow-channel-storage";
 import { STORAGE_SYNC_FAILED_EVENT, defaultUserStorageProvider, defaultUserWebDAVStorageProvider, saveUserStorageProvider, saveUserWebDAVStorageProvider } from "@/services/image-storage";
-import { defaultConfig, useConfigStore, type AiConfig } from "@/stores/use-config-store";
+import { markSetupGuideDone, shouldOfferSetupGuide } from "@/components/layout/setup-guide";
+import { commitPreparedLocalChannels, defaultConfig, useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useChannelTranslationStore } from "@/stores/use-channel-translation-store";
 
@@ -94,6 +96,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                     if (canceled || useUserStore.getState().token !== accountToken || useUserStore.getState().user?.id !== accountId) return;
 					Object.entries(modelConfig)
 						.forEach(([key, value]) => updateConfig(key as keyof AiConfig, value as never));
+					commitPreparedLocalChannels(updateConfig);
 				}
 				updateConfig("workflowSyncTouched", workflowsReady);
 				updateConfig("syncStorageConfig", syncS3);
@@ -120,6 +123,16 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     }, [isTokenDanceCallback, token, updateConfig, user?.id]);
 
     useEffect(() => {
+        if (!publicSettings || isLoginPage || pathname.startsWith("/admin") || !shouldOfferSetupGuide()) return;
+        const channels = useConfigStore.getState().config.localChannels || [];
+        if (channels.some((channel) => channel.apiKey?.trim())) {
+            markSetupGuideDone();
+            return;
+        }
+        openConfigDialog(false);
+    }, [isLoginPage, openConfigDialog, pathname, publicSettings]);
+
+    useEffect(() => {
         if (handledConfigParams.current) return;
         const searchParams = new URLSearchParams(window.location.search);
         const baseUrl = searchParams.get("baseUrl") || searchParams.get("baseurl");
@@ -134,7 +147,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
         if (!publicSettings.modelChannel.allowCustomChannel) {
             openConfigDialog(false);
-            message.error("后台未允许用户自定义渠道，请联系管理员进行配置");
+            message.error(t("后台未允许用户自定义渠道，请联系管理员进行配置"));
             return;
         }
         updateConfig("channelMode", "local");

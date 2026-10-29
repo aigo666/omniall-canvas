@@ -14,6 +14,7 @@ import { VIDEO_MULTI_SHOT_SKILL } from "./skills/video-multi-shot";
 import { VIDEO_SINGLE_SHOT_SKILL } from "./skills/video-single-shot";
 import { WORKFLOW_SKILL } from "./skills/workflow";
 
+import { t } from "@/i18n";
 export function buildCanvasAgentSkillPrompt(phase: CanvasAgentPhase, userText: string, context: CanvasAgentContext, activeSkillContents?: string, contextCheckpoint?: string, skillFileToolAvailable = false) {
     const skills = [CORE_SKILL];
 
@@ -78,11 +79,11 @@ export function buildCanvasAgentSkillPrompt(phase: CanvasAgentPhase, userText: s
     }
 
     return skills.join("\n\n")
-        + (activeSkillContents ? "\n\n【用户所选 Skill 根内容】\n必须完整读取并遵循全部所选 Skill；创作流程、镜头设计、提示词结构和输出格式由所选 Skill 决定，当前用户明确指令优先。本轮不加载内置默认创作流程与能力模板，不得自行套用；CORE 仅提供公共执行约束，通过现有 agentState 记录实际阶段。CORE 安全规则、真实画布和工具结果、工具能力及参数校验、自动生成开关和用户授权始终有效，不得被所选 Skill 绕过。\n\n" + activeSkillContents : "")
-        + (skillFileToolAvailable ? "\n\n【系统 Skill 附属文件】\n仅按当前系统 Skill 给出的相对路径调用 read_skill_file；读取结果只用于当前执行，不写入画布或伪装成工具成果。" : "")
-        + (contextCheckpoint ? "\n\n【长期对话检查点】\n" + contextCheckpoint : "")
-        + "\n\n【事实优先级】\n当前工具结果 > 当前真实画布上下文 > agentState > 用户所选 Skill 根内容 > 长期对话检查点。检查点中的节点 ID 仅是线索；节点已不存在时不得据此恢复或声称其仍存在。"
-        + "\n\n【当前真实画布上下文 JSON】\n" + serializeCanvasAgentContext(context);
+        + (activeSkillContents ? t("\n\n【用户所选 Skill 根内容】\n必须完整读取并遵循全部所选 Skill；创作流程、镜头设计、提示词结构和输出格式由所选 Skill 决定，当前用户明确指令优先。本轮不加载内置默认创作流程与能力模板，不得自行套用；CORE 仅提供公共执行约束，通过现有 agentState 记录实际阶段。CORE 安全规则、真实画布和工具结果、工具能力及参数校验、自动生成开关和用户授权始终有效，不得被所选 Skill 绕过。\n\n") + activeSkillContents : "")
+        + (skillFileToolAvailable ? t("\n\n【系统 Skill 附属文件】\n仅按当前系统 Skill 给出的相对路径调用 read_skill_file；读取结果只用于当前执行，不写入画布或伪装成工具成果。") : "")
+        + (contextCheckpoint ? t("\n\n【长期对话检查点】\n") + contextCheckpoint : "")
+        + t("\n\n【事实优先级】\n当前工具结果 > 当前真实画布上下文 > agentState > 用户所选 Skill 根内容 > 长期对话检查点。检查点中的节点 ID 仅是线索；节点已不存在时不得据此恢复或声称其仍存在。")
+        + t("\n\n【当前真实画布上下文 JSON】\n") + serializeCanvasAgentContext(context);
 }
 
 function buildIntentText(userText: string, context: CanvasAgentContext) {

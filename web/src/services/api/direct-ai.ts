@@ -11,6 +11,7 @@ import { isPlainRecord, readPath, readString } from "./protocols/shared";
 import { tokenDanceRecoveryMessage, tokenDanceTaskID } from "./protocols/tokendance";
 import type { DirectProtocolAdapter, DirectVideoResponse } from "./protocols/types";
 
+import { t } from "@/i18n";
 type DirectRequestBody = Record<string, unknown> | FormData;
 type DirectReferenceKind = "image" | "video" | "audio";
 type DirectReference = { marker: string; file: File; kind: DirectReferenceKind };
@@ -34,7 +35,7 @@ export async function autoDLReferenceURL(reference: ReferenceImage | ReferenceVi
     const source = "dataUrl" in reference
         ? await resolveImageUrl(reference.storageKey, reference.dataUrl || reference.url || "")
         : await resolveMediaUrl(reference.storageKey, reference.url);
-    if (!source) throw new Error("参考素材不可用");
+    if (!source) throw new Error(t("参考素材不可用"));
     const uploaded = await uploadRemoteMediaToServer(source, reference.name || "reference");
     const url = publicReferenceURL(uploaded.url) || await storedReferenceURL(uploaded.storageKey);
     if (!url) throw new Error(`${providerName} 参考素材需要云存储提供可公开访问的地址`);
@@ -64,7 +65,7 @@ export async function requestDirectImages(config: AiConfig, provider: DirectAIPr
     const directUrls = protocol.readCreatedImageURLs?.(created) || [];
     if (directUrls.length) return directImageResponse(directUrls);
     const rawTaskId = protocol.readTaskId(created);
-    if (!rawTaskId) throw new Error(protocol.readError(created) || "图片接口没有返回结果或任务 ID");
+    if (!rawTaskId) throw new Error(protocol.readError(created) || t("图片接口没有返回结果或任务 ID"));
     const taskId = provider === "tokendance" ? tokenDanceTaskID(plan.protocol, rawTaskId) : rawTaskId;
 
     for (;;) {
@@ -74,7 +75,7 @@ export async function requestDirectImages(config: AiConfig, provider: DirectAIPr
         const result = protocol.readImagePoll(payload);
         if (result.error) throw new Error(result.error);
         if (result.urls.length) return directImageResponse(result.urls);
-        if (result.done) throw new Error("图片任务已完成但没有返回图片地址");
+        if (result.done) throw new Error(t("图片任务已完成但没有返回图片地址"));
     }
 }
 
@@ -85,7 +86,7 @@ export async function createDirectVideoTask(config: AiConfig, provider: DirectAI
         : protocol;
     const payload = await requestDirectJSON(requestProtocol, plan.url, apiKey, plan.contentType, requestBody, undefined, signal);
     const rawTaskId = protocol.readTaskId(payload);
-    if (!rawTaskId) throw new Error(protocol.readError(payload) || "视频接口没有返回任务 ID");
+    if (!rawTaskId) throw new Error(protocol.readError(payload) || t("视频接口没有返回任务 ID"));
     const taskId = provider === "tokendance" ? tokenDanceTaskID(plan.protocol, rawTaskId) : rawTaskId;
     return {
         id: taskId,
@@ -106,10 +107,10 @@ export async function requestDirectAudioURL(config: AiConfig, provider: DirectAI
     const startedAt = Date.now();
     const timeoutSeconds = Number(config.timeout) || 600;
     const { plan, requestBody, apiKey, protocol } = await prepareDirectRequest(config, provider, "/audio/speech", body);
-    if (!protocol.readAudioPoll) throw new Error("当前协议不支持异步音频");
+    if (!protocol.readAudioPoll) throw new Error(t("当前协议不支持异步音频"));
     const created = await requestDirectJSON(protocol, plan.url, apiKey, plan.contentType, requestBody, remainingTimeoutMs(startedAt, timeoutSeconds), signal);
     const id = protocol.readTaskId(created);
-    if (!id) throw new Error(protocol.readError(created) || "音频接口没有返回任务 ID");
+    if (!id) throw new Error(protocol.readError(created) || t("音频接口没有返回任务 ID"));
     for (;;) {
         await delay(Math.min(DIRECT_IMAGE_POLL_INTERVAL_MS, remainingTimeoutMs(startedAt, timeoutSeconds)), signal);
         const payload = await requestDirectJSON(protocol, directPollURL(config, protocol, id), apiKey, "", undefined, remainingTimeoutMs(startedAt, timeoutSeconds), signal);
@@ -129,7 +130,7 @@ async function prepareDirectRequest(config: AiConfig, provider: DirectAIProvider
         endpoint,
         body: serialized.body,
     });
-    if (plan.provider !== provider) throw new Error("前后端渠道识别结果不一致");
+    if (plan.provider !== provider) throw new Error(t("前后端渠道识别结果不一致"));
     const protocol = directProtocolAdapters[provider];
     const replaced = await uploadAndReplaceReferences(protocol, plan, serialized.references, channel.apiKey);
     const requestBody = plan.formData ? restoreDirectFormData(replaced) : replaced;
@@ -138,7 +139,7 @@ async function prepareDirectRequest(config: AiConfig, provider: DirectAIProvider
 
 function requireDirectChannel(config: AiConfig) {
     const channel = localChannelForActiveModel(config);
-    if (!channel?.baseUrl.trim() || !channel.apiKey.trim()) throw new Error("本地渠道地址或 API Key 不能为空");
+    if (!channel?.baseUrl.trim() || !channel.apiKey.trim()) throw new Error(t("本地渠道地址或 API Key 不能为空"));
     return channel;
 }
 
@@ -245,9 +246,9 @@ function parseJSONString(value: string): unknown {
 }
 
 function assertSafeDirectBody(value: unknown) {
-    if (isFile(value) || isBlob(value)) throw new Error("参考文件不能传给参数转译接口");
+    if (isFile(value) || isBlob(value)) throw new Error(t("参考文件不能传给参数转译接口"));
     if (typeof value === "string") {
-        if (isMediaDataURL(value) || value.startsWith("blob:")) throw new Error("参考文件不能传给参数转译接口");
+        if (isMediaDataURL(value) || value.startsWith("blob:")) throw new Error(t("参考文件不能传给参数转译接口"));
         return;
     }
     if (Array.isArray(value)) {
@@ -274,7 +275,7 @@ async function uploadAndReplaceReferences(protocol: DirectProtocolAdapter, plan:
         uploaded.set(reference.marker, await uploadDirectReference(protocol, spec, reference.file, apiKey));
     }));
     const replaced = replaceDirectMarkers(plan.body, uploaded);
-    if (containsAnyDirectMarker(replaced)) throw new Error("参考素材地址替换失败");
+    if (containsAnyDirectMarker(replaced)) throw new Error(t("参考素材地址替换失败"));
     return replaced;
 }
 
@@ -292,7 +293,7 @@ async function uploadDirectReference(protocol: DirectProtocolAdapter, spec: Dire
         const value = readString(readPath(payload, path));
         if (value) return value;
     }
-    throw new Error("参考素材上传成功但没有返回文件地址");
+    throw new Error(t("参考素材上传成功但没有返回文件地址"));
 }
 
 function containsDirectMarker(value: unknown, marker: string): boolean {
@@ -323,7 +324,7 @@ function replaceDirectMarkers(value: unknown, uploaded: Map<string, unknown>): u
 }
 
 function restoreDirectFormData(value: unknown) {
-    if (!isPlainRecord(value)) throw new Error("TokenDance multipart 转译结果格式错误");
+    if (!isPlainRecord(value)) throw new Error(t("TokenDance multipart 转译结果格式错误"));
     const formData = new FormData();
     const append = (key: string, item: unknown) => {
         if (item instanceof File) formData.append(key, item, item.name);
@@ -382,9 +383,9 @@ function directImageResponse(urls: string[]): DirectImageResponse {
 }
 
 function directReferenceKindName(kind: DirectReferenceKind) {
-    if (kind === "video") return "视频";
-    if (kind === "audio") return "音频";
-    return "图片";
+    if (kind === "video") return t("视频");
+    if (kind === "audio") return t("音频");
+    return t("图片");
 }
 
 function remainingTimeoutMs(startedAt: number, timeoutSeconds: number) {

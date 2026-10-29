@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { ReloadOutlined } from "@ant-design/icons";
 import { App, Button, Checkbox, Flex, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
 import dynamic from "next/dynamic";
@@ -10,10 +11,10 @@ import { modelMatchesCapability, type ModelCapabilities, type ModelCapability } 
 type ModelSelectTabKey = "new" | "current";
 const ChannelParameterTranslationEditor = dynamic(() => import("@/components/channel-parameter-translation-editor").then((module) => module.ChannelParameterTranslationEditor), { ssr: false });
 const capabilityOptions: Array<{ label: string; value: ModelCapability }> = [
-    { label: "生图", value: "image" },
-    { label: "视频", value: "video" },
-    { label: "文本", value: "text" },
-    { label: "音频", value: "audio" },
+    { get label() { return t("生图"); }, value: "image" },
+    { get label() { return t("视频"); }, value: "video" },
+    { get label() { return t("文本"); }, value: "text" },
+    { get label() { return t("音频"); }, value: "audio" },
 ];
 
 type ChannelModelSelectorModalProps = {
@@ -57,7 +58,7 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
             if (fetchedModels === undefined) return;
             onModelsFetched?.(fetchedModels);
             if (!fetchedModels.length) {
-                message.warning("上游未返回模型列表，请手动输入模型名称");
+                message.warning(t("上游未返回模型列表，请手动输入模型名称"));
                 return;
             }
             const current = uniqueModels(selected);
@@ -69,7 +70,7 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
             setActiveTab("new");
             message.success(`已获取 ${fetchedModels.length} 个模型，请选择后确认`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "读取模型失败");
+            message.error(error instanceof Error ? error.message : t("读取模型失败"));
         } finally {
             setFetching(false);
         }
@@ -98,7 +99,7 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
         try {
             await onConfirm(uniqueModels(selected), modelCapabilities, translation ?? parameterTranslation ?? "");
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "保存渠道配置失败");
+            message.error(error instanceof Error ? error.message : t("保存渠道配置失败"));
         } finally {
             setSaving(false);
         }
@@ -109,9 +110,11 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
         <Modal
             title={
                 <Space size={12}>
-                    选择渠道模型
+                    
+                    {t("选择渠道模型")}
                     <Typography.Text type="secondary">
-                        已选择 {selected.length} / {uniqueModels([...source, ...existing]).length}
+                        
+                        {t("已选择")} {selected.length} / {uniqueModels([...source, ...existing]).length}
                     </Typography.Text>
                 </Space>
             }
@@ -120,9 +123,10 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
             onCancel={onCancel}
             footer={
                 <Space>
-                    <Button onClick={onCancel}>取消</Button>
+                    <Button onClick={onCancel}>{t("取消")}</Button>
                     <Button type="primary" loading={saving} onClick={() => void confirm()}>
-                        确定
+                        
+                        {t("确定")}
                     </Button>
                 </Space>
             }
@@ -130,12 +134,13 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
         >
             <Flex vertical gap={14}>
                 <Flex gap={12} wrap>
-                    <Input.Search placeholder="搜索模型" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ flex: "1 1 260px" }} />
+                    <Input.Search placeholder={t("搜索模型")} allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ flex: "1 1 260px" }} />
                     <Space.Compact style={{ flex: "1 1 320px" }}>
-                        <Input value={newModel} placeholder={channel?.protocol === "autodl" ? "输入工作流 ID" : "输入模型名称"} onChange={(event) => setNewModel(event.target.value)} onPressEnter={addModel} />
-                        <Button onClick={addModel}>增加模型</Button>
+                        <Input value={newModel} placeholder={channel?.protocol === "autodl" ? t("输入工作流 ID") : t("输入模型名称")} onChange={(event) => setNewModel(event.target.value)} onPressEnter={addModel} />
+                        <Button onClick={addModel}>{t("增加模型")}</Button>
                         <Button icon={<ReloadOutlined />} loading={fetching} onClick={() => void fetchModels()}>
-                            拉取模型列表
+                            
+                            {t("拉取模型列表")}
                         </Button>
                     </Space.Compact>
                 </Flex>
@@ -150,20 +155,25 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
                 />
                 <Flex justify="space-between" align="center" gap={12} wrap>
                     <Typography.Text type="secondary">
-                        当前列表已选择 {activeSelectedCount} / {activeModels.length}
+                        
+                        {t("当前列表已选择")} {activeSelectedCount} / {activeModels.length}
                     </Typography.Text>
                     <Space size={8}>
                         <Button size="small" type={isClassifying ? "primary" : "default"} disabled={!selected.length} onClick={() => { setActiveTab("classification"); setKeyword(""); }}>
-                            模型分类设置
+                            
+                            {t("模型分类设置")}
                         </Button>
                         <Button size="small" disabled={parameterTranslation === undefined} onClick={() => setIsTranslationOpen(true)}>
-                            自定传参转译
+                            
+                            {t("自定传参转译")}
                         </Button>
                         <Button size="small" disabled={isClassifying || !activeModels.length || activeSelectedCount === activeModels.length} onClick={selectActiveModels}>
-                            全选当前列表
+                            
+                            {t("全选当前列表")}
                         </Button>
                         <Button size="small" disabled={isClassifying || !activeSelectedCount} onClick={clearActiveModels}>
-                            取消当前列表
+                            
+                            {t("取消当前列表")}
                         </Button>
                     </Space>
                 </Flex>
@@ -191,7 +201,7 @@ export function ChannelModelSelectorModal({ channel, parameterTranslation, model
                         </div>
                     ) : (
                         <div style={{ padding: "48px 0", textAlign: "center" }}>
-                            <Typography.Text type="secondary">没有匹配的模型</Typography.Text>
+                            <Typography.Text type="secondary">{t("没有匹配的模型")}</Typography.Text>
                         </div>
                     )}
                 </div>

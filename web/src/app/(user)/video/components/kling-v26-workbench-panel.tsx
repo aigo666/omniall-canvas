@@ -7,60 +7,61 @@ import { boolConfig } from "@/lib/seedance-video";
 import type { AiConfig, VideoElementItem, VideoElementReference, VideoMultiPromptItem } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 
+import { t } from "@/i18n";
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
 type WorkbenchLayout = "side" | "bottom";
 type AssetPickerTarget = "general" | "image" | "video" | "audio" | "firstFrame" | "lastFrame";
 
 const TEXT = {
-    prompt: "提示词",
-    pastePrompt: "读取剪贴板",
-    clear: "清空",
-    promptLibrary: "提示词库",
-    assets: "我的素材",
-    promptPlaceholder: "描述镜头运动、主体动作、场景氛围和画面风格",
-    negativePrompt: "负面提示词",
-    negativePlaceholder: "描述不希望出现在视频中的内容",
-    referenceImage: "首尾帧",
-    clipboard: "剪贴板",
-    upload: "上传",
-    chooseAsset: "从素材库选择",
-    model: "模型",
-    mode: "模式选择",
-    std: "标准模式(720P 无声)",
-    pro: "专业模式(1080P 音频)",
-    k4: "4K模式",
-    size: "尺寸",
-    seconds: "秒数",
-    audioTitle: "音频生成",
-    generateAudio: "生成音频",
-    audioSwitchLabel: "是否生成与视频同步的AI音频",
-    audioHint: "仅专业模式，仅一张参考图可用",
-    multiShotTitle: "多镜头分镜",
-    multiShotHint: "是否启用多镜头分镜模式",
-    shotType: "分镜模式",
-    shotCustom: "自定义",
-    shotSmart: "智能分镜",
-    shotPrompt: "分镜提示词",
-    shotPlaceholder: "描述当前分镜的镜头内容",
-    addShot: "新增分镜提示词",
-    deleteShot: "删除",
-    taskCount: "任务数量",
-    task: "任务",
-    start: "开始生成",
-    runningPrefix: "生成中（",
+    get prompt() { return t("提示词"); },
+    get pastePrompt() { return t("读取剪贴板"); },
+    get clear() { return t("清空"); },
+    get promptLibrary() { return t("提示词库"); },
+    get assets() { return t("我的素材"); },
+    get promptPlaceholder() { return t("描述镜头运动、主体动作、场景氛围和画面风格"); },
+    get negativePrompt() { return t("负面提示词"); },
+    get negativePlaceholder() { return t("描述不希望出现在视频中的内容"); },
+    get referenceImage() { return t("首尾帧"); },
+    get clipboard() { return t("剪贴板"); },
+    get upload() { return t("上传"); },
+    get chooseAsset() { return t("从素材库选择"); },
+    get model() { return t("模型"); },
+    get mode() { return t("模式选择"); },
+    get std() { return t("标准模式(720P 无声)"); },
+    get pro() { return t("专业模式(1080P 音频)"); },
+    get k4() { return t("4K模式"); },
+    get size() { return t("尺寸"); },
+    get seconds() { return t("秒数"); },
+    get audioTitle() { return t("音频生成"); },
+    get generateAudio() { return t("生成音频"); },
+    get audioSwitchLabel() { return t("是否生成与视频同步的AI音频"); },
+    get audioHint() { return t("仅专业模式，仅一张参考图可用"); },
+    get multiShotTitle() { return t("多镜头分镜"); },
+    get multiShotHint() { return t("是否启用多镜头分镜模式"); },
+    get shotType() { return t("分镜模式"); },
+    get shotCustom() { return t("自定义"); },
+    get shotSmart() { return t("智能分镜"); },
+    get shotPrompt() { return t("分镜提示词"); },
+    get shotPlaceholder() { return t("描述当前分镜的镜头内容"); },
+    get addShot() { return t("新增分镜提示词"); },
+    get deleteShot() { return t("删除"); },
+    get taskCount() { return t("任务数量"); },
+    get task() { return t("任务"); },
+    get start() { return t("开始生成"); },
+    get runningPrefix() { return t("生成中（"); },
     runningSuffix: "）",
-    title: "视频创作台",
-    side: "侧边",
-    bottom: "底部",
-    image: "图",
-    removeImage: "移除参考图",
-    emptyImages: "暂无首尾帧，支持单首帧",
-    elementList: "元素列表",
-    elementName: "元素名称，在提示词中使用@前缀引用",
-    elementDescription: "元素描述",
-    elementEmpty: "暂无参考图，最多 2-4 张\n暂无参考视频，有效长度需至少 3-8 秒\n暂无参考音频，音频时长必须为 5-30 秒",
-    addElement: "新增元素",
-    deleteElement: "删除元素",
+    get title() { return t("视频创作台"); },
+    get side() { return t("侧边"); },
+    get bottom() { return t("底部"); },
+    get image() { return t("图"); },
+    get removeImage() { return t("移除参考图"); },
+    get emptyImages() { return t("暂无首尾帧，支持单首帧"); },
+    get elementList() { return t("元素列表"); },
+    get elementName() { return t("元素名称，在提示词中使用@前缀引用"); },
+    get elementDescription() { return t("元素描述"); },
+    get elementEmpty() { return t("暂无参考图，最多 2-4 张\n暂无参考视频，有效长度需至少 3-8 秒\n暂无参考音频，音频时长必须为 5-30 秒"); },
+    get addElement() { return t("新增元素"); },
+    get deleteElement() { return t("删除元素"); },
 };
 
 export function KlingV26WorkbenchPanel({
@@ -211,13 +212,13 @@ export function KlingV26WorkbenchPanel({
         try {
             const text = (await navigator.clipboard.readText()).trim();
             if (!text) {
-                message.error("剪切板里没有可读取的文本");
+                message.error(t("剪切板里没有可读取的文本"));
                 return;
             }
             updateMultiPrompt(index, { prompt: text });
-            message.success("已读取剪切板文本");
+            message.success(t("已读取剪切板文本"));
         } catch {
-            message.error("剪切板里没有可读取的文本");
+            message.error(t("剪切板里没有可读取的文本"));
         }
     };
 
@@ -225,13 +226,13 @@ export function KlingV26WorkbenchPanel({
         try {
             const text = (await navigator.clipboard.readText()).trim();
             if (!text) {
-                message.error("剪切板里没有可读取的文本");
+                message.error(t("剪切板里没有可读取的文本"));
                 return;
             }
             onNegativePromptChange(text);
-            message.success("已读取剪切板文本");
+            message.success(t("已读取剪切板文本"));
         } catch {
-            message.error("剪切板里没有可读取的文本");
+            message.error(t("剪切板里没有可读取的文本"));
         }
     };
 
@@ -271,17 +272,17 @@ export function KlingV26WorkbenchPanel({
                         <Input.TextArea value={negativePrompt} onChange={(event) => onNegativePromptChange(event.target.value)} rows={4} placeholder={TEXT.negativePlaceholder} />
                     </div>
                 </KlingSection> : null}
-                {showsReferenceImages ? <KlingSection title={usesFrameImages ? TEXT.referenceImage : "参考图"} count={references.length}>
+                {showsReferenceImages ? <KlingSection title={usesFrameImages ? TEXT.referenceImage : t("参考图")} count={references.length}>
                     <div className="space-y-2">
                         <div className="flex flex-wrap gap-1">
                             <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteReferences}>{TEXT.clipboard}</Button>
                             <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>{TEXT.upload}</Button>
                             <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("image")}>{TEXT.chooseAsset}</Button>
                         </div>
-                        <KlingReferenceImageStrip references={references} emptyText={usesFrameImages ? TEXT.emptyImages : "暂无参考图"} onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} />
+                        <KlingReferenceImageStrip references={references} emptyText={usesFrameImages ? TEXT.emptyImages : t("暂无参考图")} onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} />
                     </div>
                 </KlingSection> : null}
-                {referenceVideoSection ? <KlingSection title="参考视频" count={referenceVideoCount}>{referenceVideoSection}</KlingSection> : null}
+                {referenceVideoSection ? <KlingSection title={t("参考视频")} count={referenceVideoCount}>{referenceVideoSection}</KlingSection> : null}
                 {isKlingV3 && showsElements ? (
                     <KlingElementListSection
                         items={elementList}

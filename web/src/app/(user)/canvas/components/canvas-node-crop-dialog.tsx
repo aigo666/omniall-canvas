@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Button, Dropdown, Modal } from "antd";
 import { Check, ChevronDown, Lock, LockOpen, X } from "lucide-react";
@@ -92,13 +93,13 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
 
     const ratioMenu = {
         items: [
-            { key: "free", label: "自由比例" },
-            { key: "original", label: "原始比例" },
-            { key: "1:1", label: "1:1 比例" },
-            { key: "4:3", label: "4:3 比例" },
-            { key: "16:9", label: "16:9 比例" },
-            { key: "3:4", label: "3:4 比例" },
-            { key: "9:16", label: "9:16 比例" },
+            { key: "free", label: t("自由比例") },
+            { key: "original", label: t("原始比例") },
+            { key: "1:1", label: t("1:1 比例") },
+            { key: "4:3", label: t("4:3 比例") },
+            { key: "16:9", label: t("16:9 比例") },
+            { key: "3:4", label: t("3:4 比例") },
+            { key: "9:16", label: t("9:16 比例") },
         ],
         onClick: ({ key }: { key: string }) => {
             if (key === "free") {
@@ -113,19 +114,19 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     };
 
     const getRatioLabel = () => {
-        if (aspectRatio === null) return "自由比例";
-        if (image && Math.abs(aspectRatio - image.width / image.height) < 0.01) return "原始比例";
-        if (Math.abs(aspectRatio - 1) < 0.01) return "1:1 比例";
-        if (Math.abs(aspectRatio - 4/3) < 0.01) return "4:3 比例";
-        if (Math.abs(aspectRatio - 16/9) < 0.01) return "16:9 比例";
-        if (Math.abs(aspectRatio - 3/4) < 0.01) return "3:4 比例";
-        if (Math.abs(aspectRatio - 9/16) < 0.01) return "9:16 比例";
-        return "比例锁定";
+        if (aspectRatio === null) return t("自由比例");
+        if (image && Math.abs(aspectRatio - image.width / image.height) < 0.01) return t("原始比例");
+        if (Math.abs(aspectRatio - 1) < 0.01) return t("1:1 比例");
+        if (Math.abs(aspectRatio - 4/3) < 0.01) return t("4:3 比例");
+        if (Math.abs(aspectRatio - 16/9) < 0.01) return t("16:9 比例");
+        if (Math.abs(aspectRatio - 3/4) < 0.01) return t("3:4 比例");
+        if (Math.abs(aspectRatio - 9/16) < 0.01) return t("9:16 比例");
+        return t("比例锁定");
     };
 
     return (
         <Modal 
-            title="裁剪图片" 
+            title={t("裁剪图片")} 
             open={open && Boolean(dataUrl)} 
             onCancel={loading ? undefined : onClose} 
             footer={null} 
@@ -146,7 +147,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                             <div className="pointer-events-none absolute inset-y-0 left-1/3 border-l border-white/50" />
                             <div className="pointer-events-none absolute inset-y-0 left-2/3 border-l border-white/50" />
                             {handles.map((handle) => (
-                                <button key={handle} type="button" className="absolute size-3 rounded-full border border-black bg-white" style={handleStyle(handle)} onPointerDown={(event) => startDrag("resize", event, handle)} aria-label="调整裁剪框" />
+                                <button key={handle} type="button" className="absolute size-3 rounded-full border border-black bg-white" style={handleStyle(handle)} onPointerDown={(event) => startDrag("resize", event, handle)} aria-label={t("调整裁剪框")} />
                             ))}
                         </div>
                     </div>
@@ -154,11 +155,12 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
 
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2">
                     <div className="flex flex-wrap items-center gap-3 text-sm opacity-80">
-                        <span>裁剪尺寸 {cropSize ? `${cropSize.width} x ${cropSize.height}` : "未知"}</span>
-                        <span>比例 {cropSize ? formatRatio(cropSize.width, cropSize.height) : "未知"}</span>
+                        <span>{t("裁剪尺寸")} {cropSize ? `${cropSize.width} x ${cropSize.height}` : t("未知")}</span>
+                        <span>{t("比例")} {cropSize ? formatRatio(cropSize.width, cropSize.height) : t("未知")}</span>
                         {image ? (
                             <span>
-                                原图 {image.width} x {image.height}
+                                
+                                {t("原图")} {image.width} x {image.height}
                             </span>
                         ) : null}
                     </div>
@@ -170,12 +172,13 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                    <Button disabled={loading} onClick={() => setCrop(defaultCrop)}>重置</Button>
+                    <Button disabled={loading} onClick={() => setCrop(defaultCrop)}>{t("重置")}</Button>
                     <Button disabled={loading} icon={<X className="size-4" />} onClick={onClose}>
-                        取消
+                        
+                        {t("取消")}
                     </Button>
                     <Button type="primary" loading={loading} icon={!loading && <Check className="size-4" />} onClick={handleConfirm}>
-                        {loading ? "正在裁剪..." : "确认裁剪"}
+                        {loading ? t("正在裁剪...") : t("确认裁剪")}
                     </Button>
                 </div>
             </div>

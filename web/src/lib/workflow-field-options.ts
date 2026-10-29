@@ -1,5 +1,6 @@
 import type { WorkflowFieldMapping } from "@/lib/workflow-channel";
 
+import { t } from "@/i18n";
 const ratioOptions = ["1:1", "16:9", "9:16", "4:3", "3:4", "4:5", "5:4", "3:2", "2:3", "21:9", "9:21"];
 const resolutionAspectRatios = ["1:1 (Square)", "2:3 (Portrait Photo)", "3:2 (Photo)", "3:4 (Portrait Standard)", "4:3 (Standard)", "9:16 (Portrait Widescreen)", "16:9 (Widescreen)", "21:9 (Ultrawide)"];
 const presetOptions: Record<string, string[]> = {
@@ -65,7 +66,7 @@ export function workflowFieldPresetOptions(field?: WorkflowFieldMapping): string
 
 export function workflowFieldConfigurationError(field: WorkflowFieldMapping) {
     const bounds = workflowFieldNumberBounds(field);
-    if (bounds.min !== undefined && bounds.max !== undefined && bounds.min > bounds.max) return "最小值不能大于最大值";
-    if (bounds.step !== undefined && bounds.step <= 0) return "步长必须大于 0";
+    if (bounds.min !== undefined && bounds.max !== undefined && bounds.min > bounds.max) return t("最小值不能大于最大值");
+    if (bounds.step !== undefined && bounds.step <= 0) return t("步长必须大于 0");
     return "";
 }

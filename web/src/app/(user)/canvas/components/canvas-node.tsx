@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -154,7 +155,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     }, [isEditingTitle]);
 
     const finishTitleEditing = useCallback(() => {
-        const title = titleDraft.trim() || data.title || "未命名节点";
+        const title = titleDraft.trim() || data.title || t("未命名节点");
         setTitleDraft(title);
         setIsEditingTitle(false);
         if (title !== data.title) onTitleChange(data.id, title);
@@ -331,19 +332,19 @@ export const CanvasNode = React.memo(function CanvasNode({
                         type="button"
                         className="block max-w-full truncate border-b border-dashed border-transparent px-0 py-0.5 text-left text-xs font-medium opacity-75 transition hover:border-current hover:opacity-100"
                         style={{ color: theme.node.text }}
-                        title="双击修改节点名称"
+                        title={t("双击修改节点名称")}
                         onDoubleClick={(event) => {
                             event.stopPropagation();
                             setIsEditingTitle(true);
                         }}
                     >
-                        {data.title || "未命名节点"}
+                        {data.title || t("未命名节点")}
                     </button>
                 )}
             </div> : null}
             {isGroup && !referenceSelectionState ? (
                 <div className="pointer-events-none absolute right-3 top-[-28px] z-[65] text-xs opacity-75" style={{ color: theme.node.text }}>
-                    {groupChildCount} 个节点
+                    {groupChildCount}  {t("个节点")}
                 </div>
             ) : null}
 
@@ -423,7 +424,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 
                 {referenceSelectionState && (referenceSelectionState !== "available" || hovered) ? (
                     <div className="pointer-events-none absolute inset-0 z-[60] grid place-items-center rounded-[inherit]" style={{ background: `color-mix(in srgb, ${theme.canvas.background} ${referenceSelectionState === "target" ? 78 : referenceSelectionState === "disabled" ? 60 : 34}%, transparent)`, boxShadow: referenceSelectionState === "available" ? `inset 0 0 0 2px ${selectionBlue}` : undefined }}>
-                        {referenceSelectionState !== "disabled" ? <span className="rounded-lg px-3 py-2 text-sm font-medium shadow-sm" style={{ background: theme.toolbar.panel, color: theme.node.text }}>{referenceSelectionState === "target" ? "正在添加参考" : "选择"}</span> : null}
+                        {referenceSelectionState !== "disabled" ? <span className="rounded-lg px-3 py-2 text-sm font-medium shadow-sm" style={{ background: theme.toolbar.panel, color: theme.node.text }}>{referenceSelectionState === "target" ? t("正在添加参考") : t("选择")}</span> : null}
                     </div>
                 ) : null}
 
@@ -451,8 +452,8 @@ function NodeContent(props: NodeContentRendererProps) {
     if (props.isBatchRoot) return props.node.type === CanvasNodeType.Panorama ? <PanoramaNodeContent {...props} /> : <ImageNodeContent {...props} />;
     if (props.node.metadata?.status === "stopped") return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: props.theme.node.muted }}>
-            <span className="text-sm">已停止</span>
-            <button type="button" className="rounded-full border px-3 py-1.5 text-xs" style={{ color: props.theme.node.text, background: props.theme.toolbar.panel, borderColor: props.theme.toolbar.border }} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); props.onRetry?.(props.node); }}>重新生成</button>
+            <span className="text-sm">{t("已停止")}</span>
+            <button type="button" className="rounded-full border px-3 py-1.5 text-xs" style={{ color: props.theme.node.text, background: props.theme.toolbar.panel, borderColor: props.theme.toolbar.border }} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); props.onRetry?.(props.node); }}>{t("重新生成")}</button>
         </div>
     );
     if ((props.node.metadata?.status === "loading" || props.node.metadata?.status === "stopping") && (props.node.type !== CanvasNodeType.Text || !props.node.metadata.content)) return <LoadingContent node={props.node} theme={props.theme} now={props.now} />;
@@ -484,7 +485,7 @@ function LoadingContent({ node, theme, now }: Pick<NodeContentRendererProps, "no
     const startedAt = typeof node.metadata?.startedAt === "number" ? node.metadata.startedAt : startTimeRef.current;
     const elapsedMs = Math.max(0, currentNow - startedAt);
     const progress = Math.max(0, Math.min(100, Math.round(node.metadata?.progress || 0)));
-    const stopLabel = node.metadata?.status === "stopping" ? node.metadata.errorDetails ? "停止失败，请重试停止" : "正在停止" : "";
+    const stopLabel = node.metadata?.status === "stopping" ? node.metadata.errorDetails ? t("停止失败，请重试停止") : t("正在停止") : "";
 
     if (node.type === CanvasNodeType.Video) {
         return (
@@ -492,7 +493,7 @@ function LoadingContent({ node, theme, now }: Pick<NodeContentRendererProps, "no
                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
                     <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: selectionBlue }} />
                     <div className="text-sm font-semibold" style={{ color: selectionBlue }}>
-                        {stopLabel || `正在创作 ${progress}%`}
+                        {stopLabel || t("正在创作 {progress}%", { progress })}
                     </div>
                     <span className="rounded-full px-2 py-1 text-xs" style={{ background: theme.toolbar.panel, color: theme.node.text }}>
                         {formatDuration(elapsedMs)}
@@ -500,7 +501,7 @@ function LoadingContent({ node, theme, now }: Pick<NodeContentRendererProps, "no
                 </div>
                 <div className="space-y-1">
                     <div className="flex items-center justify-between text-[11px]" style={{ color: theme.node.muted }}>
-                        <span>当前创作进度</span>
+                        <span>{t("当前创作进度")}</span>
                         <span>{progress}%</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full" style={{ background: theme.node.stroke }}>
@@ -514,7 +515,7 @@ function LoadingContent({ node, theme, now }: Pick<NodeContentRendererProps, "no
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
             <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
-            <span className="text-[10px] tracking-[0.2em]">{stopLabel || (progress > 0 ? `生成中 ${progress}%` : "生成中")}</span>
+            <span className="text-[10px] tracking-[0.2em]">{stopLabel || (progress > 0 ? t("生成中 {progress}%", { progress }) : t("生成中"))}</span>
             <span className="rounded-full border px-2 py-1 text-xs tracking-normal" style={{ borderColor: theme.node.stroke, color: theme.node.text }}>
                 {formatDuration(elapsedMs)}
             </span>
@@ -530,7 +531,7 @@ function LoadingContent({ node, theme, now }: Pick<NodeContentRendererProps, "no
 function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry">) {
     return (
         <div className="flex max-w-[260px] flex-col items-center gap-3 px-5 text-center">
-            <div className="text-xs leading-5 text-red-300">{node.metadata?.errorDetails || "生成失败"}</div>
+            <div className="text-xs leading-5 text-red-300">{node.metadata?.errorDetails || t("生成失败")}</div>
             <button
                 type="button"
                 className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition hover:scale-[1.02]"
@@ -542,7 +543,8 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 <RefreshCw className="size-3.5" />
-                重试
+                
+                {t("重试")}
             </button>
         </div>
     );
@@ -551,7 +553,8 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
 function UnknownNodeContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
     return (
         <div className="flex h-full w-full items-center justify-center text-sm" style={{ color: theme.node.placeholder }}>
-            未知节点
+            
+            {t("未知节点")}
         </div>
     );
 }
@@ -585,7 +588,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                     style={textStyle}
                     onWheelCapture={(event) => event.stopPropagation()}
                 >
-                    {node.metadata?.content || <span style={{ color: theme.node.placeholder }}>双击编辑文字</span>}
+                    {node.metadata?.content || <span style={{ color: theme.node.placeholder }}>{t("双击编辑文字")}</span>}
                 </div>
             )}
         </div>
@@ -650,7 +653,7 @@ function EmptyImageContent({ node, theme, isBatchRoot, batchCount, batchExpanded
             <div className="flex size-14 items-center justify-center rounded-2xl" style={{ background: theme.toolbar.activeBg }}>
                 <ImageIcon className="size-6 opacity-30" />
             </div>
-            <span className="text-[10px] tracking-[0.18em] opacity-50">{node.type === CanvasNodeType.Panorama ? "空全景图节点" : "空图片节点"}</span>
+            <span className="text-[10px] tracking-[0.18em] opacity-50">{node.type === CanvasNodeType.Panorama ? t("空全景图节点") : t("空图片节点")}</span>
         </div>
     );
     if (isBatchRoot)
@@ -683,7 +686,7 @@ function VideoNodeContent({ node, theme, isSelected, onViewImage }: NodeContentR
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
                 <Video className="size-7 opacity-35" />
-                <span className="text-sm">空视频节点</span>
+                <span className="text-sm">{t("空视频节点")}</span>
             </div>
         );
     const controlStyle = { background: theme.toolbar.panel, color: theme.toolbar.item };
@@ -697,10 +700,10 @@ function VideoNodeContent({ node, theme, isSelected, onViewImage }: NodeContentR
         <div className="relative h-full w-full overflow-hidden rounded-[18px] bg-black">
             <video ref={videoRef} src={node.metadata.content} tabIndex={-1} playsInline className="h-full w-full object-contain outline-none" onLoadStart={() => { setVideoTime(0); setMediaDurationMs(0); }} onLoadedMetadata={(event) => setMediaDurationMs(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration * 1000 : 0)} onTimeUpdate={(event) => setVideoTime(event.currentTarget.currentTime)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onKeyDown={(event) => { if (isSelected && event.code === "Space") { event.preventDefault(); event.stopPropagation(); togglePlayback(); } }} />
             {mediaDurationMs > 0 ? <span className="pointer-events-none absolute left-2 top-2 z-20 flex h-7 items-center justify-center rounded-md px-2 text-[11px] font-medium opacity-70 backdrop-blur" style={controlStyle}>{new Date(mediaDurationMs).toISOString().slice(mediaDurationMs >= 3_600_000 ? 11 : 14, 19)}</span> : null}
-            <button type="button" title={isPlaying ? "暂停" : "播放"} aria-label={isPlaying ? "暂停" : "播放"} className={`${controlClassName} left-2`} style={controlStyle} onClick={(event) => { event.stopPropagation(); togglePlayback(); }} onMouseDown={keepVideoFocus} onDoubleClick={(event) => event.stopPropagation()}>
+            <button type="button" title={isPlaying ? t("暂停") : t("播放")} aria-label={isPlaying ? t("暂停") : t("播放")} className={`${controlClassName} left-2`} style={controlStyle} onClick={(event) => { event.stopPropagation(); togglePlayback(); }} onMouseDown={keepVideoFocus} onDoubleClick={(event) => event.stopPropagation()}>
                 {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
             </button>
-            <button type="button" title="放大预览" aria-label="放大预览" className={`${controlClassName} right-2`} style={controlStyle} onClick={(event) => { event.stopPropagation(); videoRef.current?.pause(); onViewImage?.(node); }} onMouseDown={keepVideoFocus} onDoubleClick={(event) => event.stopPropagation()}>
+            <button type="button" title={t("放大预览")} aria-label={t("放大预览")} className={`${controlClassName} right-2`} style={controlStyle} onClick={(event) => { event.stopPropagation(); videoRef.current?.pause(); onViewImage?.(node); }} onMouseDown={keepVideoFocus} onDoubleClick={(event) => event.stopPropagation()}>
                 <Maximize2 className="size-3.5" />
             </button>
             <div className="absolute bottom-2 left-11 right-11 z-20 flex h-7 items-center" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
@@ -711,7 +714,7 @@ function VideoNodeContent({ node, theme, isSelected, onViewImage }: NodeContentR
                     step="0.01"
                     value={Math.min(videoTime, videoDuration)}
                     disabled={videoDuration <= 0}
-                    aria-label="视频进度"
+                    aria-label={t("视频进度")}
                     onChange={(event) => {
                         if (!videoRef.current) return;
                         const time = event.currentTarget.valueAsNumber;
@@ -732,14 +735,14 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2" style={{ color: theme.node.placeholder }}>
                 <Music2 className="size-7 opacity-35" />
-                <span className="text-sm">空音频节点</span>
+                <span className="text-sm">{t("空音频节点")}</span>
             </div>
         );
     return (
         <div className="flex h-full w-full flex-col justify-center gap-3 px-4" style={{ background: theme.node.fill, color: theme.node.text }}>
             <div className="flex min-w-0 items-center gap-2 text-sm opacity-70">
                 <Music2 className="size-4 shrink-0" />
-                <span className="truncate">{node.title || "音频"}</span>
+                <span className="truncate">{node.title || t("音频")}</span>
             </div>
             <audio src={node.metadata.content} controls className="w-full" data-canvas-no-zoom />
         </div>
@@ -788,7 +791,7 @@ function ImageContent({
                     type="button"
                     className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1 rounded-full border px-2.5 text-xs font-semibold shadow-[0_6px_18px_rgba(15,23,42,.10)] backdrop-blur-md transition hover:scale-[1.02]"
                     style={{ background: `${theme.toolbar.panel}d9`, borderColor: `${theme.toolbar.border}cc`, color: theme.node.text }}
-                    aria-label={batchExpanded ? "图片组已展开" : "图片组已收起"}
+                    aria-label={batchExpanded ? t("图片组已展开") : t("图片组已收起")}
                     onClick={(event) => {
                         event.stopPropagation();
                         onToggleBatch?.();
@@ -813,7 +816,8 @@ function ImageContent({
                     onPointerDown={(event) => event.stopPropagation()}
                 >
                     <Star className="size-3.5 text-[#2f80ff]" />
-                    设为主图
+                    
+                    {t("设为主图")}
                 </button>
             ) : null}
         </BatchFrame>

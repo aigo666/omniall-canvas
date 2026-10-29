@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { App, Button, Empty, Input, Modal, Pagination, Spin, Tabs, Tag } from "antd";
@@ -31,13 +32,13 @@ export function AssetPickerModal({ open, defaultTab = "my-assets", onInsert, onC
     }, [open, defaultTab]);
 
     return (
-        <Modal title="选择素材" open={open} onCancel={onClose} footer={null} width={860} destroyOnHidden styles={{ body: { padding: "0 24px 24px", minHeight: 480 } }}>
+        <Modal title={t("选择素材")} open={open} onCancel={onClose} footer={null} width={860} destroyOnHidden styles={{ body: { padding: "0 24px 24px", minHeight: 480 } }}>
             <Tabs
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as AssetPickerTab)}
                 items={[
-                    { key: "my-assets", label: "我的素材", children: <MyAssetsTab onInsert={onInsert} /> },
-                    { key: "library", label: "素材库", children: <LibraryTab onInsert={onInsert} /> },
+                    { key: "my-assets", label: t("我的素材"), children: <MyAssetsTab onInsert={onInsert} /> },
+                    { key: "library", label: t("素材库"), children: <LibraryTab onInsert={onInsert} /> },
                 ]}
             />
         </Modal>
@@ -47,11 +48,11 @@ export function AssetPickerModal({ open, defaultTab = "my-assets", onInsert, onC
 const PAGE_SIZE = 8;
 
 const kindOptions = [
-    { label: "全部", value: "all" },
-    { label: "文本", value: "text" },
-    { label: "图片", value: "image" },
-    { label: "视频", value: "video" },
-    { label: "音频", value: "audio" },
+    { get label() { return t("全部"); }, value: "all" },
+    { get label() { return t("文本"); }, value: "text" },
+    { get label() { return t("图片"); }, value: "image" },
+    { get label() { return t("视频"); }, value: "video" },
+    { get label() { return t("音频"); }, value: "audio" },
 ];
 
 function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
@@ -83,7 +84,7 @@ function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => v
                 onInsert({ kind: "image", dataUrl: asset.url, title: asset.title, source: "library" });
             }
         } catch {
-            message.error("插入失败");
+            message.error(t("插入失败"));
         } finally {
             setInserting(null);
         }
@@ -96,7 +97,7 @@ function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => v
                     className="w-56"
                     size="small"
                     prefix={<Search className="size-3.5 text-stone-400" />}
-                    placeholder="搜索素材"
+                    placeholder={t("搜索素材")}
                     value={keyword}
                     allowClear
                     onChange={(e) => {
@@ -106,11 +107,11 @@ function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => v
                 />
                 <div className="flex gap-1.5">
                     {[
-                        { label: "全部", value: "" },
-                        { label: "文本", value: "text" },
-                        { label: "图片", value: "image" },
-                        { label: "视频", value: "video" },
-                        { label: "音频", value: "audio" },
+                        { label: t("全部"), value: "" },
+                        { label: t("文本"), value: "text" },
+                        { label: t("图片"), value: "image" },
+                        { label: t("视频"), value: "video" },
+                        { label: t("音频"), value: "audio" },
                     ].map((opt) => (
                         <Tag.CheckableTag
                             key={opt.value || "all"}
@@ -138,7 +139,7 @@ function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => v
                     ))}
                 </div>
             ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有素材" className="py-12" />
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("没有素材")} className="py-12" />
             )}
 
             {total > PAGE_SIZE && (
@@ -166,7 +167,7 @@ function PickerCard({ title, kind, cover, loading, onClick }: { title: string; k
             <div className="p-2.5">
                 <div className="flex items-center justify-between gap-2">
                     <span className="line-clamp-1 text-xs font-medium text-stone-800 dark:text-stone-200">{title}</span>
-                    <Tag className="m-0 shrink-0 text-[10px]">{kind === "image" ? "图片" : kind === "video" ? "视频" : kind === "audio" ? "音频" : "文本"}</Tag>
+                    <Tag className="m-0 shrink-0 text-[10px]">{kind === "image" ? t("图片") : kind === "video" ? t("视频") : kind === "audio" ? t("音频") : t("文本")}</Tag>
                 </div>
             </div>
             {loading && (
@@ -174,7 +175,7 @@ function PickerCard({ title, kind, cover, loading, onClick }: { title: string; k
                     <Spin size="small" />
                 </div>
             )}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-stone-950/55 group-hover:opacity-100">插入</div>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-stone-950/55 group-hover:opacity-100">{t("插入")}</div>
         </button>
     );
 }
@@ -235,7 +236,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
     const createAsset = async () => {
         const title = createTitle.trim();
         if (!title) {
-            message.error("请输入素材名称");
+            message.error(t("请输入素材名称"));
             return;
         }
         setSaving(true);
@@ -243,13 +244,13 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
             if (createKind === "text") {
                 const content = createText.trim();
                 if (!content) {
-                    message.error("请输入文本内容");
+                    message.error(t("请输入文本内容"));
                     return;
                 }
                 addAsset({ kind: "text", title, coverUrl: "", tags: [], source: "素材选择器", data: { content } });
             } else if (createKind === "image") {
                 if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择图片或填写图片 URL");
+                    message.error(t("请选择图片或填写图片 URL"));
                     return;
                 }
                 const stored = selectedFile ? await uploadImage(selectedFile) : null;
@@ -263,7 +264,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                 });
             } else if (createKind === "video") {
                 if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择视频或填写视频 URL");
+                    message.error(t("请选择视频或填写视频 URL"));
                     return;
                 }
                 const stored = selectedFile ? await uploadAssetMediaFile(selectedFile, "asset-video") : null;
@@ -279,7 +280,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                 });
             } else {
                 if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择音频或填写音频 URL");
+                    message.error(t("请选择音频或填写音频 URL"));
                     return;
                 }
                 const stored = selectedFile ? await uploadAssetMediaFile(selectedFile, "asset-audio") : null;
@@ -292,11 +293,11 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     data: stored ? { url: stored.url, storageKey: stored.storageKey, bytes: stored.bytes, mimeType: stored.mimeType, durationMs: stored.durationMs } : { url: createUrl.trim(), mimeType: "audio/mpeg" },
                 });
             }
-            message.success("素材已新增");
+            message.success(t("素材已新增"));
             setCreateOpen(false);
             resetCreateForm();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "新增素材失败");
+            message.error(error instanceof Error ? error.message : t("新增素材失败"));
         } finally {
             setSaving(false);
         }
@@ -309,7 +310,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     className="w-56"
                     size="small"
                     prefix={<Search className="size-3.5 text-stone-400" />}
-                    placeholder="搜索素材"
+                    placeholder={t("搜索素材")}
                     value={keyword}
                     allowClear
                     onChange={(e) => {
@@ -333,7 +334,8 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     ))}
                 </div>
                 <Button size="small" icon={<Plus className="size-3.5" />} onClick={() => setCreateOpen(true)}>
-                    新增素材
+                    
+                    {t("新增素材")}
                 </Button>
             </div>
 
@@ -344,7 +346,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     ))}
                 </div>
             ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有素材" className="py-12" />
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("没有素材")} className="py-12" />
             )}
 
             {filtered.length > PAGE_SIZE && (
@@ -353,40 +355,40 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                 </div>
             )}
             <Modal
-                title="新增素材"
+                title={t("新增素材")}
                 open={createOpen}
                 onCancel={() => {
                     setCreateOpen(false);
                     resetCreateForm();
                 }}
                 onOk={() => void createAsset()}
-                okText="保存"
+                okText={t("保存")}
                 confirmLoading={saving}
                 destroyOnHidden
             >
                 <div className="space-y-3 pt-2">
                     <div className="flex gap-2">
                         {[
-                            { value: "image" as const, label: "图片" },
-                            { value: "text" as const, label: "文本" },
-                            { value: "video" as const, label: "视频" },
-                            { value: "audio" as const, label: "音频" },
+                            { value: "image" as const, label: t("图片") },
+                            { value: "text" as const, label: t("文本") },
+                            { value: "video" as const, label: t("视频") },
+                            { value: "audio" as const, label: t("音频") },
                         ].map((item) => (
                             <Tag.CheckableTag key={item.value} checked={createKind === item.value} className={cn("prompt-filter-tag", createKind === item.value && "is-active")} onChange={() => setCreateKind(item.value)}>
                                 {item.label}
                             </Tag.CheckableTag>
                         ))}
                     </div>
-                    <Input value={createTitle} placeholder="素材名称" onChange={(event) => setCreateTitle(event.target.value)} />
+                    <Input value={createTitle} placeholder={t("素材名称")} onChange={(event) => setCreateTitle(event.target.value)} />
                     {createKind === "text" ? (
-                        <Input.TextArea value={createText} autoSize={{ minRows: 5, maxRows: 10 }} placeholder="文本内容" onChange={(event) => setCreateText(event.target.value)} />
+                        <Input.TextArea value={createText} autoSize={{ minRows: 5, maxRows: 10 }} placeholder={t("文本内容")} onChange={(event) => setCreateText(event.target.value)} />
                     ) : (
                         <div className="space-y-2">
                             <input ref={fileInputRef} type="file" accept={createKind === "image" ? "image/*" : createKind === "video" ? "video/*" : "audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav"} className="hidden" onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
                             <Button icon={<ImagePlus className="size-4" />} onClick={() => fileInputRef.current?.click()}>
-                                {selectedFile ? selectedFile.name : createKind === "image" ? "选择图片" : createKind === "video" ? "选择视频" : "选择音频"}
+                                {selectedFile ? selectedFile.name : createKind === "image" ? t("选择图片") : createKind === "video" ? t("选择视频") : t("选择音频")}
                             </Button>
-                            <Input value={createUrl} placeholder={createKind === "image" ? "图片 URL" : createKind === "video" ? "视频 URL" : "音频 URL"} onChange={(event) => setCreateUrl(event.target.value)} />
+                            <Input value={createUrl} placeholder={createKind === "image" ? t("图片 URL") : createKind === "video" ? t("视频 URL") : t("音频 URL")} onChange={(event) => setCreateUrl(event.target.value)} />
                         </div>
                     )}
                 </div>

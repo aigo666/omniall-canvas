@@ -3,6 +3,7 @@ import { create } from "zustand";
 
 import type { ChannelTranslation } from "@/lib/channel-parameter-translation";
 
+import { t } from "@/i18n";
 const storage = localforage.createInstance({ name: "infinite-canvas", storeName: "channel_translations" });
 let writeQueue = Promise.resolve();
 type TranslationStore = {
@@ -31,7 +32,7 @@ export const useChannelTranslationStore = create<TranslationStore>((set, get) =>
         return channelIds.filter((id) => records[id]).map((channelId) => ({ channelId, parameterTranslation: records[channelId] }));
     },
     save: async (accountId, channelId, source) => {
-        if (!channelId) throw new Error("缺少渠道 ID");
+        if (!channelId) throw new Error(t("缺少渠道 ID"));
         const next = writeQueue.then(async () => {
             const records = { ...(get().accounts[accountId] || (await storage.getItem<Record<string, string>>(encodeURIComponent(accountId))) || {}) };
             if (source.trim()) records[channelId] = source.trim();

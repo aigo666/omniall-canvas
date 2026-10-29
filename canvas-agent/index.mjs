@@ -9,6 +9,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { CodexClient } from "./codex.mjs";
+import { openCodexInstallGuide, readCodexLoginStatus, startCodexLogin } from "./codex-bin.mjs";
+import { attachCursorMcpClient, cursorCliStatus, openCursorApp, openCursorInstallGuide, readCursorLoginStatus, readCursorMcpStatus, registerCursorMcp, resolveCursorRuntime, startCursorChat, startCursorLogin } from "./cursor-bin.mjs";
 
 const entry = fileURLToPath(import.meta.url);
 const configPath = resolve(homedir(), ".infinite-canvas", "codex-agent.json");
@@ -164,10 +166,34 @@ async function startMcp() {
     server.setRequestHandler(ListToolsRequestSchema, async () => {
         try {
             const tools = await request(toolsPath);
-            return { tools: source === "codex" ? tools : tools.filter(({ name }) => name !== "set_agent_state" && name !== "read_skill_file") };
-        } catch { return { tools: [] }; }
+            const filtered = source === "codex" ? tools : tools.filter(({ name }) => name !== "set_agent_state" && name !== "read_skill_file");
+            if (filtered.length) return { tools: filtered };
+            return {
+                tools: [{
+                    name: "canvas_connection_status",
+                    description: "当前画布未连接或没有可用工具。请先在 OmniAll 打开画布并完成 Cursor/Agent 连接后再操作。",
+                    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+                }],
+            };
+        } catch (error) {
+            return {
+                tools: [{
+                    name: "canvas_connection_status",
+                    description: `画布 MCP 暂不可用：${error instanceof Error ? error.message : "请先在 OmniAll 打开画布并完成连接"}`,
+                    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+                }],
+            };
+        }
     });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, { signal }) => {
+        if (params.name === "canvas_connection_status") {
+            try {
+                const tools = await request(toolsPath);
+                return { content: [{ type: "text", text: tools.length ? `画布已连接，可用工具 ${tools.length} 个` : "画布未连接，请先在 OmniAll 打开画布并完成连接" }] };
+            } catch (error) {
+                return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "画布未连接" }] };
+            }
+        }
         try {
             const result = await request("/tools/call", { name: params.name, arguments: params.arguments || {} }, signal);
             return { isError: result?.ok === false, content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -206,6 +232,80 @@ function startHttp() {
         }
         if (req.method === "OPTIONS") return res.sendStatus(204);
         if (req.method === "GET" && req.path === "/config") return res.json({ url: endpoint, hasToken: Boolean(token) });
+        if (req.method === "GET" && req.path === "/session") return res.json({ url: endpoint, token });
+        if (req.method === "GET" && req.path === "/prepare") {
+            return readCodexLoginStatus().then((login) => res.json({
+                url: endpoint,
+                token,
+                installed: login.installed === true,
+                ready: login.ready === true,
+                loggedIn: login.loggedIn === true,
+                detail: login.detail,
+                codexSource: login.source,
+                codexLabel: login.label,
+                codexVersion: login.version,
+                hasSystemCodex: login.installed === true,
+                installUrl: login.installUrl,
+                installCommand: login.installCommand,
+                message: login.message,
+            })).catch((error) => res.status(500).json({ error: error.message || "无法检查 Codex 状态" }));
+        }
+        if (req.method === "POST" && req.path === "/install") {
+            return openCodexInstallGuide().then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法打开 Codex 安装说明" }));
+        }
+        if (req.method === "POST" && req.path === "/login") {
+            return startCodexLogin().then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法启动 Codex 登录" }));
+        }
+        if (req.method === "GET" && req.path === "/cursor/prepare") {
+            return Promise.all([resolveCursorRuntime(), cursorCliStatus(), readCursorLoginStatus()]).then(([runtime, cli, login]) => {
+                const mcp = readCursorMcpStatus(token, port);
+                const ready = runtime.installed && cli.installed && login.loggedIn && mcp.registered;
+                const message = !runtime.installed
+                    ? runtime.message
+                    : !cli.installed
+                        ? cli.message
+                        : !login.loggedIn
+                            ? login.message
+                            : mcp.registered
+                                ? "本机 Cursor 已登录，可直接连接"
+                                : "本机 Cursor 已安装，连接时将写入画布 MCP";
+                return res.json({
+                    url: endpoint,
+                    token,
+                    installed: runtime.installed,
+                    cliInstalled: cli.installed,
+                    loggedIn: login.loggedIn,
+                    ready,
+                    registered: mcp.registered,
+                    version: runtime.version,
+                    appPath: runtime.appPath,
+                    hasCli: runtime.hasCli,
+                    installUrl: runtime.installUrl,
+                    installCommand: cli.installCommand,
+                    mcpPath: mcp.mcpPath,
+                    mcpName: "omniall-canvas",
+                    message,
+                });
+            }).catch((error) => res.status(500).json({ error: error.message || "无法检查 Cursor 状态" }));
+        }
+        if (req.method === "POST" && req.path === "/cursor/login") {
+            return startCursorLogin().then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法打开 Cursor 登录" }));
+        }
+        if (req.method === "POST" && req.path === "/cursor/install") {
+            return openCursorInstallGuide().then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法打开 Cursor 安装说明" }));
+        }
+        if (req.method === "POST" && req.path === "/cursor/open") {
+            return openCursorApp().then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法打开 Cursor" }));
+        }
+        if (req.method === "POST" && req.path === "/cursor/register") {
+            return registerCursorMcp({ token, port }).then((result) => res.json(result))
+                .catch((error) => res.status(500).json({ error: error.message || "无法注册 Cursor MCP" }));
+        }
         const credential = req.path === "/events" ? req.query.token : req.headers["x-canvas-agent-token"];
         if (credential !== token) return res.status(401).json({ error: "Token 不正确" });
         if (origin && !origins.has(origin)) {
@@ -215,6 +315,65 @@ function startHttp() {
         next();
     });
     app.use(express.json({ limit: "20mb" }));
+    app.post("/cursor/chat", async (req, res) => {
+        const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+        if (!prompt) return res.status(400).json({ error: "缺少对话内容" });
+        const cli = await cursorCliStatus();
+        res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache");
+        if (!cli.installed) {
+            res.write(JSON.stringify({ type: "error", message: cli.message }) + "\n");
+            return res.end();
+        }
+        const login = await readCursorLoginStatus();
+        if (!login.loggedIn) {
+            await startCursorLogin();
+            res.write(JSON.stringify({ type: "error", message: "请在浏览器完成 Cursor 登录，完成后重新发送" }) + "\n");
+            return res.end();
+        }
+        const connected = [...sessions.values()].filter((session) => session.events && session.canvasId);
+        if (!connected.length) {
+            res.write(JSON.stringify({ type: "error", message: "当前没有已连接的画布。请先打开画布页面，点 Cursor「连接」并进入「开始创作」后再发送消息。" }) + "\n");
+            return res.end();
+        }
+        if (connected.length > 1) {
+            res.write(JSON.stringify({ type: "error", message: "检测到多个已连接画布。请只保留一个画布标签页后再试。" }) + "\n");
+            return res.end();
+        }
+        const session = connected[0];
+        attachCursorMcpClient(session.clientId);
+        const child = startCursorChat({ prompt, token, port, clientId: session.clientId });
+        let stderr = "";
+        child.stderr.on("data", (chunk) => { stderr += chunk; });
+        child.stdout.on("data", (chunk) => {
+            for (const line of String(chunk).split("\n")) {
+                if (!line.trim()) continue;
+                let event;
+                try { event = JSON.parse(line); } catch { continue; }
+                if (event.type === "assistant" && event.timestamp_ms && !event.model_call_id) {
+                    const text = Array.isArray(event.message?.content) ? event.message.content.map((item) => item?.text || "").join("") : "";
+                    if (text) res.write(JSON.stringify({ type: "delta", text, sessionId: event.session_id || "" }) + "\n");
+                } else if (event.type === "result") {
+                    res.write(JSON.stringify({ type: "done", text: event.result || "", sessionId: event.session_id || "", isError: event.is_error === true }) + "\n");
+                }
+            }
+        });
+        child.on("error", (error) => {
+            res.write(JSON.stringify({ type: "error", message: error.message || "无法启动 Cursor CLI" }) + "\n");
+            res.end();
+        });
+        child.on("close", (code) => {
+            if (code && !res.writableEnded) {
+                const raw = stderr.trim();
+                const message = /authentication required|not logged in/i.test(raw)
+                    ? "请在浏览器完成 Cursor 登录，完成后重新发送"
+                    : (raw || "Cursor 对话失败");
+                res.write(JSON.stringify({ type: "error", message }) + "\n");
+            }
+            if (!res.writableEnded) res.end();
+        });
+        req.on("close", () => child.kill());
+    });
     app.post("/connect", (req, res) => {
         const { clientId, canvasId, tools } = req.body;
         if (typeof clientId !== "string" || !clientId || typeof canvasId !== "string" || !canvasId || !Array.isArray(tools)) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { FileText, Image as ImageIcon, Music2, Plus, Settings2, Trash2, Video as VideoIcon, X } from "lucide-react";
@@ -103,14 +104,14 @@ function VideoSettingsPortal({ buttonRect, panelRef, placement, theme, config, o
     return createPortal(
         <div ref={panelRef} className="canvas-image-settings-popover" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             <div className="space-y-4">
-                <div className="text-lg font-semibold">视频设置</div>
+                <div className="text-lg font-semibold">{t("视频设置")}</div>
                 {!visualOnly && isKlingMotionControl ? <CharacterOrientationSetting value={config.videoCharacterOrientation} theme={theme} onChange={(value) => onConfigChange("videoCharacterOrientation", value)} /> : null}
                 {!visualOnly && isKlingV3 ? <KlingV3AdvancedSettings config={config} metadata={metadata} resourceOptions={resourceOptions} theme={theme} isKIEKlingV3={isKIEKlingV3} kieKlingOmni={kieKlingOmni} onConfigChange={onConfigChange} onMetadataChange={onMetadataChange} /> : null}
                 {!visualOnly && frameReferencesEnabled ? (
-                    <CanvasSettingGroup title="首尾帧" color={theme.node.muted}>
+                    <CanvasSettingGroup title={t("首尾帧")} color={theme.node.muted}>
                         <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
-                            <FrameReferencePicker label="首帧" value={firstFrameValue} options={frameOptions} theme={theme} onChange={(value) => onFrameChange?.({ firstFrameNodeId: value || undefined })} />
-                            <FrameReferencePicker label="尾帧" value={lastFrameValue} options={frameOptions} theme={theme} onChange={(value) => onFrameChange?.({ lastFrameNodeId: value || undefined })} />
+                            <FrameReferencePicker label={t("首帧")} value={firstFrameValue} options={frameOptions} theme={theme} onChange={(value) => onFrameChange?.({ firstFrameNodeId: value || undefined })} />
+                            <FrameReferencePicker label={t("尾帧")} value={lastFrameValue} options={frameOptions} theme={theme} onChange={(value) => onFrameChange?.({ lastFrameNodeId: value || undefined })} />
                         </div>
                     </CanvasSettingGroup>
                 ) : null}
@@ -124,10 +125,10 @@ function VideoSettingsPortal({ buttonRect, panelRef, placement, theme, config, o
 function CharacterOrientationSetting({ value, theme, onChange }: { value?: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (value: string) => void }) {
     const current = value === "image" ? "image" : "video";
     return (
-        <CanvasSettingGroup title="角色朝向参考" color={theme.node.muted}>
+        <CanvasSettingGroup title={t("角色朝向参考")} color={theme.node.muted}>
             <div className="grid grid-cols-2 gap-2.5">
-                <OptionPill selected={current === "image"} theme={theme} onClick={() => onChange("image")}>图片</OptionPill>
-                <OptionPill selected={current === "video"} theme={theme} onClick={() => onChange("video")}>视频</OptionPill>
+                <OptionPill selected={current === "image"} theme={theme} onClick={() => onChange("image")}>{t("图片")}</OptionPill>
+                <OptionPill selected={current === "video"} theme={theme} onClick={() => onChange("video")}>{t("视频")}</OptionPill>
             </div>
         </CanvasSettingGroup>
     );
@@ -151,27 +152,27 @@ function KlingV3AdvancedSettings({ config, metadata, resourceOptions, theme, isK
 
     return (
         <>
-            {supportsMultiShot ? <CanvasSettingGroup title="多镜头分镜" color={theme.node.muted}>
+            {supportsMultiShot ? <CanvasSettingGroup title={t("多镜头分镜")} color={theme.node.muted}>
                 <div className="grid gap-1 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
-                    <SwitchRow label="多镜头分镜" hint="是否启用多镜头分镜模式" checked={multiShot} theme={theme} onChange={(checked) => onMetadataChange?.(supportsSmartShots ? { multiShot: String(checked), shotType: checked ? shotType : "intelligence" } : { multiShot: String(checked) })} />
+                    <SwitchRow label={t("多镜头分镜")} hint={t("是否启用多镜头分镜模式")} checked={multiShot} theme={theme} onChange={(checked) => onMetadataChange?.(supportsSmartShots ? { multiShot: String(checked), shotType: checked ? shotType : "intelligence" } : { multiShot: String(checked) })} />
                 </div>
             </CanvasSettingGroup> : null}
             {multiShot && supportsSmartShots ? (
-                <CanvasSettingGroup title="分镜模式" color={theme.node.muted}>
+                <CanvasSettingGroup title={t("分镜模式")} color={theme.node.muted}>
                     <div className="grid grid-cols-2 gap-2.5">
-                        <OptionPill selected={shotType === "customize"} theme={theme} onClick={() => onMetadataChange?.({ shotType: "customize" })}>自定义</OptionPill>
-                        <OptionPill selected={shotType === "intelligence"} theme={theme} onClick={() => onMetadataChange?.({ shotType: "intelligence" })}>智能分镜</OptionPill>
+                        <OptionPill selected={shotType === "customize"} theme={theme} onClick={() => onMetadataChange?.({ shotType: "customize" })}>{t("自定义")}</OptionPill>
+                        <OptionPill selected={shotType === "intelligence"} theme={theme} onClick={() => onMetadataChange?.({ shotType: "intelligence" })}>{t("智能分镜")}</OptionPill>
                     </div>
                 </CanvasSettingGroup>
             ) : null}
-            {!isKIEKlingV3 ? <CanvasSettingGroup title="负面提示词" color={theme.node.muted}>
-                <Input.TextArea value={config.videoNegativePrompt || ""} placeholder="描述不希望出现在视频中的内容" autoSize={{ minRows: 3, maxRows: 6 }} className="rounded-xl placeholder:!text-[var(--canvas-placeholder)] placeholder:!opacity-55" style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text, WebkitTextFillColor: theme.node.text, "--canvas-placeholder": theme.node.placeholder } as CSSProperties} onMouseDown={(event) => event.stopPropagation()} onChange={(event) => onConfigChange("videoNegativePrompt", event.target.value)} />
+            {!isKIEKlingV3 ? <CanvasSettingGroup title={t("负面提示词")} color={theme.node.muted}>
+                <Input.TextArea value={config.videoNegativePrompt || ""} placeholder={t("描述不希望出现在视频中的内容")} autoSize={{ minRows: 3, maxRows: 6 }} className="rounded-xl placeholder:!text-[var(--canvas-placeholder)] placeholder:!opacity-55" style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text, WebkitTextFillColor: theme.node.text, "--canvas-placeholder": theme.node.placeholder } as CSSProperties} onMouseDown={(event) => event.stopPropagation()} onChange={(event) => onConfigChange("videoNegativePrompt", event.target.value)} />
             </CanvasSettingGroup> : null}
             {supportsMultiShot && multiShot && (!supportsSmartShots || shotType === "customize") ? <KlingMultiPromptSection items={multiPrompt} options={textOptions} theme={theme} onChange={updateMultiPrompt} /> : null}
-            {showsFrameReferences ? <CanvasSettingGroup title="首尾帧" color={theme.node.muted}>
+            {showsFrameReferences ? <CanvasSettingGroup title={t("首尾帧")} color={theme.node.muted}>
                 <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
-                    <ResourceSinglePicker label="首帧" value={imageNodeIds[0] || ""} options={imageOptions} placeholder="不指定" emptyText="暂无已连接图片" theme={theme} onChange={(value) => onMetadataChange?.({ klingImageNodeIds: [value, imageNodeIds[1]].filter(Boolean) })} />
-                    <ResourceSinglePicker label="尾帧" value={imageNodeIds[1] || ""} options={imageOptions} placeholder="不指定" emptyText="暂无已连接图片" theme={theme} onChange={(value) => onMetadataChange?.({ klingImageNodeIds: [imageNodeIds[0], value].filter(Boolean) })} />
+                    <ResourceSinglePicker label={t("首帧")} value={imageNodeIds[0] || ""} options={imageOptions} placeholder={t("不指定")} emptyText={t("暂无已连接图片")} theme={theme} onChange={(value) => onMetadataChange?.({ klingImageNodeIds: [value, imageNodeIds[1]].filter(Boolean) })} />
+                    <ResourceSinglePicker label={t("尾帧")} value={imageNodeIds[1] || ""} options={imageOptions} placeholder={t("不指定")} emptyText={t("暂无已连接图片")} theme={theme} onChange={(value) => onMetadataChange?.({ klingImageNodeIds: [imageNodeIds[0], value].filter(Boolean) })} />
                 </div>
             </CanvasSettingGroup> : null}
             {showsElements ? <KlingElementListSection items={elementList} options={mediaOptions} theme={theme} onChange={updateElementList} /> : null}
@@ -182,19 +183,19 @@ function KlingV3AdvancedSettings({ config, metadata, resourceOptions, theme, isK
 function KlingMultiPromptSection({ items, options, theme, onChange }: { items: { textNodeId?: string; duration?: string }[]; options: CanvasVideoResourceOption[]; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (items: { textNodeId?: string; duration?: string }[]) => void }) {
     const update = (index: number, patch: Partial<{ textNodeId?: string; duration?: string }>) => onChange(items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
     return (
-        <CanvasSettingGroup title="分镜提示词" color={theme.node.muted}>
+        <CanvasSettingGroup title={t("分镜提示词")} color={theme.node.muted}>
             <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
                 {items.map((item, index) => (
                     <div key={index} className="grid gap-1.5">
                         <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium">分镜提示词{index + 1}</span>
+                            <span className="text-sm font-medium">{t("分镜提示词")}{index + 1}</span>
                             <div className="flex items-center gap-1.5">
                                 <NumberField value={item.duration || "1"} min={1} max={15} theme={theme} onChange={(value) => update(index, { duration: value })} />
-                                <IconButton title="新增分镜提示词" theme={theme} onClick={() => onChange([...items, { textNodeId: "", duration: "1" }])}><Plus className="size-3.5" /></IconButton>
-                                <IconButton title="删除分镜提示词" disabled={items.length <= 1} danger theme={theme} onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-3.5" /></IconButton>
+                                <IconButton title={t("新增分镜提示词")} theme={theme} onClick={() => onChange([...items, { textNodeId: "", duration: "1" }])}><Plus className="size-3.5" /></IconButton>
+                                <IconButton title={t("删除分镜提示词")} disabled={items.length <= 1} danger theme={theme} onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-3.5" /></IconButton>
                             </div>
                         </div>
-                        <ResourceSinglePicker value={item.textNodeId || ""} options={options} placeholder="请选择文字节点" emptyText="暂无已连接文字节点" theme={theme} onChange={(value) => update(index, { textNodeId: value })} />
+                        <ResourceSinglePicker value={item.textNodeId || ""} options={options} placeholder={t("请选择文字节点")} emptyText={t("暂无已连接文字节点")} theme={theme} onChange={(value) => update(index, { textNodeId: value })} />
                     </div>
                 ))}
             </div>
@@ -205,17 +206,17 @@ function KlingMultiPromptSection({ items, options, theme, onChange }: { items: {
 function KlingElementListSection({ items, options, theme, onChange }: { items: { name?: string; description?: string; nodeIds?: string[] }[]; options: CanvasVideoResourceOption[]; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (items: { name?: string; description?: string; nodeIds?: string[] }[]) => void }) {
     const update = (index: number, patch: Partial<{ name?: string; description?: string; nodeIds?: string[] }>) => onChange(items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
     return (
-        <CanvasSettingGroup title="元素列表" color={theme.node.muted}>
+        <CanvasSettingGroup title={t("元素列表")} color={theme.node.muted}>
             <div className="grid gap-3">
                 {items.map((item, index) => (
                     <div key={index} className="rounded-xl border" style={{ borderColor: theme.node.stroke }}>
                         <div className="flex items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: theme.node.stroke }}>
-                            <div className="flex items-center gap-2"><span className="text-sm font-medium">元素列表{index + 1}</span><span className="rounded-md px-1.5 py-0.5 text-xs" style={{ background: theme.node.fill }}>{item.nodeIds?.length || 0}</span></div>
-                            <div className="flex items-center gap-1.5"><IconButton title="新增元素" disabled={items.length >= 3} theme={theme} onClick={() => onChange([...items, { name: "", description: "", nodeIds: [] }])}><Plus className="size-3.5" /></IconButton><IconButton title="删除元素" disabled={items.length <= 1} danger theme={theme} onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-3.5" /></IconButton></div>
+                            <div className="flex items-center gap-2"><span className="text-sm font-medium">{t("元素列表")}{index + 1}</span><span className="rounded-md px-1.5 py-0.5 text-xs" style={{ background: theme.node.fill }}>{item.nodeIds?.length || 0}</span></div>
+                            <div className="flex items-center gap-1.5"><IconButton title={t("新增元素")} disabled={items.length >= 3} theme={theme} onClick={() => onChange([...items, { name: "", description: "", nodeIds: [] }])}><Plus className="size-3.5" /></IconButton><IconButton title={t("删除元素")} disabled={items.length <= 1} danger theme={theme} onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-3.5" /></IconButton></div>
                         </div>
                         <div className="grid gap-2 p-2.5">
-                            <Input value={item.name || ""} placeholder="元素名称，在提示词中使用@前缀引用" style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }} onChange={(event) => update(index, { name: event.target.value })} />
-                            <Input value={item.description || ""} placeholder="元素描述" style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }} onChange={(event) => update(index, { description: event.target.value })} />
+                            <Input value={item.name || ""} placeholder={t("元素名称，在提示词中使用@前缀引用")} style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }} onChange={(event) => update(index, { name: event.target.value })} />
+                            <Input value={item.description || ""} placeholder={t("元素描述")} style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }} onChange={(event) => update(index, { description: event.target.value })} />
                             <MultiResourcePicker values={item.nodeIds || []} options={options} theme={theme} onChange={(nodeIds) => update(index, { nodeIds })} />
                         </div>
                     </div>
@@ -228,8 +229,8 @@ function KlingElementListSection({ items, options, theme, onChange }: { items: {
 function FrameReferencePicker({ label, value, options, theme, onChange }: { label: string; value: string; options: CanvasVideoFrameOption[]; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (value: string) => void }) {
     const [open, setOpen] = useState(false);
     const selected = options.find((item) => item.nodeId === value);
-    const items = [{ nodeId: "", label: "不指定" }, ...options];
-    return <div className="relative grid gap-1.5 text-xs" style={{ color: theme.node.muted }}><div>{label}</div><button type="button" className="flex h-12 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border px-2 text-left transition hover:opacity-90" style={{ background: theme.node.fill, borderColor: open ? theme.toolbar.activeText : theme.node.stroke, color: theme.node.text }} onClick={() => setOpen((current) => !current)}><FramePreview option={selected} /><span className="min-w-0 flex-1 overflow-hidden"><span className="block truncate font-medium">{selected?.label || "不指定"}</span><span className="block truncate opacity-55">{selected ? "已连接图片节点" : options.length ? "点击选择已连接图片" : "暂无已连接图片"}</span></span>{selected ? <ClearButton onClick={() => onChange("")} /> : null}</button>{open ? <PickerMenu items={items} value={value} theme={theme} renderPreview={(item) => <FramePreview option={item.nodeId ? item : undefined} />} renderTitle={(item) => item.label} renderSubtitle={(item) => (item.nodeId ? "已连接图片节点" : "不使用首尾帧图片")} onSelect={(nodeId) => { onChange(nodeId); setOpen(false); }} /> : null}</div>;
+    const items = [{ nodeId: "", label: t("不指定") }, ...options];
+    return <div className="relative grid gap-1.5 text-xs" style={{ color: theme.node.muted }}><div>{label}</div><button type="button" className="flex h-12 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border px-2 text-left transition hover:opacity-90" style={{ background: theme.node.fill, borderColor: open ? theme.toolbar.activeText : theme.node.stroke, color: theme.node.text }} onClick={() => setOpen((current) => !current)}><FramePreview option={selected} /><span className="min-w-0 flex-1 overflow-hidden"><span className="block truncate font-medium">{selected?.label || t("不指定")}</span><span className="block truncate opacity-55">{selected ? t("已连接图片节点") : options.length ? t("点击选择已连接图片") : t("暂无已连接图片")}</span></span>{selected ? <ClearButton onClick={() => onChange("")} /> : null}</button>{open ? <PickerMenu items={items} value={value} theme={theme} renderPreview={(item) => <FramePreview option={item.nodeId ? item : undefined} />} renderTitle={(item) => item.label} renderSubtitle={(item) => (item.nodeId ? t("已连接图片节点") : t("不使用首尾帧图片"))} onSelect={(nodeId) => { onChange(nodeId); setOpen(false); }} /> : null}</div>;
 }
 
 export function ResourceSinglePicker({ label, value, options, placeholder, emptyText, theme, onChange }: { label?: string; value: string; options: CanvasVideoResourceOption[]; placeholder: string; emptyText: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (value: string) => void }) {
@@ -243,7 +244,7 @@ function MultiResourcePicker({ values, options, theme, onChange }: { values: str
     const [open, setOpen] = useState(false);
     const selected = values.map((nodeId) => options.find((item) => item.nodeId === nodeId)).filter((item): item is CanvasVideoResourceOption => Boolean(item));
     const toggle = (nodeId: string) => { if (values.includes(nodeId)) onChange(values.filter((item) => item !== nodeId)); else if (values.length < 4) onChange([...values, nodeId]); };
-    return <div className="relative"><button type="button" className="flex min-h-24 w-full min-w-0 items-center justify-center overflow-hidden rounded-xl border border-dashed p-2 text-center text-sm transition hover:opacity-90" style={{ background: theme.node.fill, borderColor: open ? theme.toolbar.activeText : theme.node.stroke, color: theme.node.text }} onClick={() => setOpen((current) => !current)}>{selected.length ? <span className="grid w-full min-w-0 gap-1.5 text-left">{selected.map((item) => <span key={item.nodeId} className="flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-lg border px-2 py-1 text-xs" style={{ borderColor: theme.node.stroke }}><ResourcePreview option={item} theme={theme} small /><span className="block min-w-0 flex-1 truncate">{optionTitle(item)}</span></span>)}</span> : <span className="opacity-55">请连接画布节点后选择素材</span>}</button>{open ? <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[1300] max-h-64 overflow-y-auto rounded-xl border p-1 shadow-2xl backdrop-blur-md" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>{options.length ? options.map((item) => { const active = values.includes(item.nodeId); const disabled = !active && values.length >= 4; return <button key={item.nodeId} type="button" disabled={disabled} className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition disabled:opacity-35" style={{ background: active ? theme.toolbar.activeBg : "transparent", color: active ? theme.toolbar.activeText : theme.node.text }} onClick={() => toggle(item.nodeId)}><ResourcePreview option={item} theme={theme} /><span className="min-w-0 flex-1"><span className="block truncate font-medium">{optionTitle(item)}</span><span className="block truncate opacity-65">{optionSubtitle(item)}</span></span><span className="text-xs opacity-60">{active ? "已选" : "选择"}</span></button>; }) : <div className="px-2 py-3 text-center text-xs opacity-55">暂无已连接素材</div>}</div> : null}</div>;
+    return <div className="relative"><button type="button" className="flex min-h-24 w-full min-w-0 items-center justify-center overflow-hidden rounded-xl border border-dashed p-2 text-center text-sm transition hover:opacity-90" style={{ background: theme.node.fill, borderColor: open ? theme.toolbar.activeText : theme.node.stroke, color: theme.node.text }} onClick={() => setOpen((current) => !current)}>{selected.length ? <span className="grid w-full min-w-0 gap-1.5 text-left">{selected.map((item) => <span key={item.nodeId} className="flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-lg border px-2 py-1 text-xs" style={{ borderColor: theme.node.stroke }}><ResourcePreview option={item} theme={theme} small /><span className="block min-w-0 flex-1 truncate">{optionTitle(item)}</span></span>)}</span> : <span className="opacity-55">{t("请连接画布节点后选择素材")}</span>}</button>{open ? <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[1300] max-h-64 overflow-y-auto rounded-xl border p-1 shadow-2xl backdrop-blur-md" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>{options.length ? options.map((item) => { const active = values.includes(item.nodeId); const disabled = !active && values.length >= 4; return <button key={item.nodeId} type="button" disabled={disabled} className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition disabled:opacity-35" style={{ background: active ? theme.toolbar.activeBg : "transparent", color: active ? theme.toolbar.activeText : theme.node.text }} onClick={() => toggle(item.nodeId)}><ResourcePreview option={item} theme={theme} /><span className="min-w-0 flex-1"><span className="block truncate font-medium">{optionTitle(item)}</span><span className="block truncate opacity-65">{optionSubtitle(item)}</span></span><span className="text-xs opacity-60">{active ? t("已选") : t("选择")}</span></button>; }) : <div className="px-2 py-3 text-center text-xs opacity-55">{t("暂无已连接素材")}</div>}</div> : null}</div>;
 }
 
 function PickerMenu<T extends { nodeId: string }>({ items, value, theme, renderPreview, renderTitle, renderSubtitle, onSelect }: { items: T[]; value: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; renderPreview: (item: T) => ReactNode; renderTitle: (item: T) => ReactNode; renderSubtitle: (item: T) => ReactNode; onSelect: (nodeId: string) => void }) {
@@ -309,10 +310,10 @@ function optionTitle(item: CanvasVideoResourceOption) {
 }
 
 function optionSubtitle(item: CanvasVideoResourceOption) {
-    if (item.kind === "text") return item.text ? shortText(item.text, 24) : "文字节点";
-    if (item.kind === "image") return "图片节点";
-    if (item.kind === "video") return "视频节点";
-    return "音频节点";
+    if (item.kind === "text") return item.text ? shortText(item.text, 24) : t("文字节点");
+    if (item.kind === "image") return t("图片节点");
+    if (item.kind === "video") return t("视频节点");
+    return t("音频节点");
 }
 
 function shortText(value: string, max: number) {

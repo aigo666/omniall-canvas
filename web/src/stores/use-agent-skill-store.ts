@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { create } from "zustand";
@@ -52,9 +54,9 @@ export const useAgentSkillStore = create<AgentSkillStore>((set, get) => ({
     },
     importSkill: async (file) => {
         const content = (await file.text()).trim();
-        if (!content) throw new Error("Skill 内容不能为空");
-        if (Array.from(content).length > AGENT_SKILL_CONTENT_MAX_LENGTH) throw new Error("Skill 内容不能超过 20000 字");
-        const name = file.name.replace(/\.(?:md|markdown|txt)$/i, "").trim() || "未命名 Skill";
+        if (!content) throw new Error(t("Skill 内容不能为空"));
+        if (Array.from(content).length > AGENT_SKILL_CONTENT_MAX_LENGTH) throw new Error(t("Skill 内容不能超过 20000 字"));
+        const name = file.name.replace(/\.(?:md|markdown|txt)$/i, "").trim() || t("未命名 Skill");
         const token = useUserStore.getState().token;
         const now = new Date().toISOString();
         const skill = token
@@ -67,12 +69,12 @@ export const useAgentSkillStore = create<AgentSkillStore>((set, get) => ({
     },
     updateSkill: async (id, patch) => {
         const existing = get().userSkills.find((item) => item.id === id);
-        if (!existing) throw new Error("Skill 不存在");
+        if (!existing) throw new Error(t("Skill 不存在"));
         const name = patch.name.trim();
         const content = patch.content.trim();
-        if (!name) throw new Error("请输入 Skill 名称");
-        if (!content) throw new Error("请输入 Skill 内容");
-        if (Array.from(content).length > AGENT_SKILL_CONTENT_MAX_LENGTH) throw new Error("Skill 内容不能超过 20000 字");
+        if (!name) throw new Error(t("请输入 Skill 名称"));
+        if (!content) throw new Error(t("请输入 Skill 内容"));
+        if (Array.from(content).length > AGENT_SKILL_CONTENT_MAX_LENGTH) throw new Error(t("Skill 内容不能超过 20000 字"));
         const token = useUserStore.getState().token;
         const next = { ...existing, ...patch, name, description: patch.description.trim(), coverUrl: patch.coverUrl.trim(), coverStorageKey: patch.coverStorageKey.trim(), content };
         const skill = token

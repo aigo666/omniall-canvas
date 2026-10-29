@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Select } from "antd";
 import { useEffect, useRef, useState } from "react";
 
@@ -40,7 +41,7 @@ export function GrokTtsVoiceSelect({ config, model, value, onChange, enabled = t
                 if (active) setVoices(items);
             })
             .catch((reason) => {
-                if (active) setError(reason instanceof Error ? reason.message : "音色读取失败");
+                if (active) setError(reason instanceof Error ? reason.message : t("音色读取失败"));
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -61,7 +62,7 @@ export function GrokTtsVoiceSelect({ config, model, value, onChange, enabled = t
             loading={loading}
             showSearch
             optionFilterProp="label"
-            notFoundContent={loading ? "正在读取音色…" : error || "暂无可用音色"}
+            notFoundContent={loading ? t("正在读取音色…") : error || t("暂无可用音色")}
             onOpenChange={(open) => {
                 if (open && error) setReload((value) => value + 1);
             }}

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Settings2 } from "lucide-react";
@@ -75,12 +76,12 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
                         {effectiveShowSize ? (
                             <>
                                 {imageQualityLabel(quality)} · {imageSizeLabel(activeSize)}
-                                {effectiveShowCount ? <> · {count} 张</> : null}
+                                {effectiveShowCount ? <> · {count}  {t("张")}</> : null}
                             </>
                         ) : (
                             <>
                                 {imageQualityLabel(quality)}
-                                {effectiveShowCount ? <> · {count} 张</> : null}
+                                {effectiveShowCount ? <> · {count}  {t("张")}</> : null}
                             </>
                         )}
                     </span>

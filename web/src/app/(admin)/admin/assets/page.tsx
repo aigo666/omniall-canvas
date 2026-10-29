@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { CopyOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
@@ -12,11 +13,11 @@ import { useAdminAssets } from "./use-admin-assets";
 type AssetFormValues = Partial<AdminAsset> & { tagText?: string };
 
 const typeOptions = [
-    { label: "全部类型", value: "" },
-    { label: "文本", value: "text" },
-    { label: "图片", value: "image" },
-    { label: "视频", value: "video" },
-    { label: "音频", value: "audio" },
+    { get label() { return t("全部类型"); }, value: "" },
+    { get label() { return t("文本"); }, value: "text" },
+    { get label() { return t("图片"); }, value: "image" },
+    { get label() { return t("视频"); }, value: "video" },
+    { get label() { return t("音频"); }, value: "audio" },
 ];
 
 const editTypeOptions = typeOptions.slice(1);
@@ -67,13 +68,13 @@ export default function AdminAssetsPage() {
 
     const columns: ProColumns<AdminAsset>[] = [
         {
-            title: "封面",
+            title: t("封面"),
             dataIndex: "coverUrl",
             width: 88,
             render: (_, item) => <Image src={item.coverUrl || item.url || "/logo.svg"} alt={item.title} width={56} height={42} style={{ objectFit: "cover", borderRadius: 6 }} preview={{ mask: "放大" }} fallback="/logo.svg" />,
         },
         {
-            title: "标题",
+            title: t("标题"),
             dataIndex: "title",
             width: 260,
             render: (_, item) => (
@@ -83,13 +84,13 @@ export default function AdminAssetsPage() {
             ),
         },
         {
-            title: "类型",
+            title: t("类型"),
             dataIndex: "type",
             width: 84,
             render: (_, item) => <Tag>{assetTypeLabel(item.type)}</Tag>,
         },
         {
-            title: "标签",
+            title: t("标签"),
             dataIndex: "tags",
             width: 180,
             render: (_, item) => (
@@ -101,24 +102,24 @@ export default function AdminAssetsPage() {
             ),
         },
         {
-            title: "分类",
+            title: t("分类"),
             dataIndex: "category",
             width: 120,
-            render: (_, item) => <Typography.Text type="secondary">{item.category || "未标注"}</Typography.Text>,
+            render: (_, item) => <Typography.Text type="secondary">{item.category || t("未标注")}</Typography.Text>,
         },
         {
-            title: "操作",
+            title: t("操作"),
             key: "actions",
             width: 112,
             render: (_, item) => (
                 <Space size={4}>
-                    <Tooltip title="详情">
+                    <Tooltip title={t("详情")}>
                         <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setDetailAsset(item)} />
                     </Tooltip>
-                    <Tooltip title="编辑">
+                    <Tooltip title={t("编辑")}>
                         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingAsset(item)} />
                     </Tooltip>
-                    <Tooltip title="删除">
+                    <Tooltip title={t("删除")}>
                         <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => setDeletingAsset(item)} />
                     </Tooltip>
                 </Space>
@@ -133,18 +134,18 @@ export default function AdminAssetsPage() {
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索标题、内容或标签" allowClear enterButton={<SearchOutlined />} onSearch={() => searchAssets(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                <Form.Item label={t("关键词")}>
+                                    <Input.Search value={keywordText} placeholder={t("搜索标题、内容或标签")} allowClear enterButton={<SearchOutlined />} onSearch={() => searchAssets(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="180px">
-                                <Form.Item label="类型">
+                                <Form.Item label={t("类型")}>
                                     <Select value={kind} onChange={changeKind} options={typeOptions} />
                                 </Form.Item>
                             </Col>
                             <Col flex="220px">
-                                <Form.Item label="标签">
-                                    <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder="全部标签" />
+                                <Form.Item label={t("标签")}>
+                                    <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder={t("全部标签")} />
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
@@ -156,10 +157,12 @@ export default function AdminAssetsPage() {
                                                 resetFilters();
                                             }}
                                         >
-                                            重置
+                                            
+                                            {t("重置")}
                                         </Button>
                                         <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchAssets(keywordText)}>
-                                            查询
+                                            
+                                            {t("查询")}
                                         </Button>
                                     </Space>
                                 </Form.Item>
@@ -178,14 +181,15 @@ export default function AdminAssetsPage() {
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
-                            <Typography.Text strong>素材列表</Typography.Text>
-                            <Tag>{total} 条</Tag>
+                            <Typography.Text strong>{t("素材列表")}</Typography.Text>
+                            <Tag>{total}  {t("条")}</Tag>
                         </Space>
                     }
                     options={{ density: true, setting: true, reload: () => void refreshAssets() }}
                     toolBarRender={() => [
                         <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingAsset({ type: "text", tags: [] })}>
-                            新增
+                            
+                            {t("新增")}
                         </Button>,
                     ]}
                     pagination={{
@@ -200,39 +204,39 @@ export default function AdminAssetsPage() {
                 />
             </Flex>
 
-            <Modal title={editingAsset?.id ? "编辑素材" : "新增素材"} open={Boolean(editingAsset)} width={760} onCancel={() => setEditingAsset(null)} onOk={() => void saveAsset()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={editingAsset?.id ? t("编辑素材") : t("新增素材")} open={Boolean(editingAsset)} width={760} onCancel={() => setEditingAsset(null)} onOk={() => void saveAsset()} okText={t("保存")} cancelText={t("取消")} destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
-                    <Form.Item name="type" label="类型" rules={[{ required: true, message: "请选择类型" }]}>
+                    <Form.Item name="type" label={t("类型")} rules={[{ required: true, message: t("请选择类型") }]}>
                         <Select options={editTypeOptions} />
                     </Form.Item>
-                    <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
+                    <Form.Item name="title" label={t("标题")} rules={[{ required: true, message: t("请输入标题") }]}>
                         <Input />
                     </Form.Item>
-                    <Form.Item name="coverUrl" label="封面 URL">
+                    <Form.Item name="coverUrl" label={t("封面 URL")}>
                         <Input />
                     </Form.Item>
-                    <Form.Item name="tagText" label="标签，用逗号分隔">
+                    <Form.Item name="tagText" label={t("标签，用逗号分隔")}>
                         <Input />
                     </Form.Item>
-                    <Form.Item name="category" label="分类">
+                    <Form.Item name="category" label={t("分类")}>
                         <Input />
                     </Form.Item>
-                    <Form.Item name="description" label="描述">
+                    <Form.Item name="description" label={t("描述")}>
                         <Input.TextArea rows={3} />
                     </Form.Item>
                     {formType === "image" || formType === "video" || formType === "audio" ? (
-                        <Form.Item name="url" label={formType === "image" ? "图片 URL" : formType === "video" ? "视频 URL" : "音频 URL"} rules={[{ required: true, message: formType === "image" ? "请输入图片 URL" : formType === "video" ? "请输入视频 URL" : "请输入音频 URL" }]}>
+                        <Form.Item name="url" label={formType === "image" ? t("图片 URL") : formType === "video" ? t("视频 URL") : t("音频 URL")} rules={[{ required: true, message: formType === "image" ? t("请输入图片 URL") : formType === "video" ? t("请输入视频 URL") : t("请输入音频 URL") }]}>
                             <Input />
                         </Form.Item>
                     ) : (
-                        <Form.Item name="content" label="文本内容" rules={[{ required: true, message: "请输入文本内容" }]}>
+                        <Form.Item name="content" label={t("文本内容")} rules={[{ required: true, message: t("请输入文本内容") }]}>
                             <Input.TextArea rows={6} />
                         </Form.Item>
                     )}
                 </Form>
             </Modal>
 
-            <Modal title="素材详情" open={Boolean(detailAsset)} width={760} onCancel={() => setDetailAsset(null)} footer={<Button onClick={() => setDetailAsset(null)}>关闭</Button>}>
+            <Modal title={t("素材详情")} open={Boolean(detailAsset)} width={760} onCancel={() => setDetailAsset(null)} footer={<Button onClick={() => setDetailAsset(null)}>{t("关闭")}</Button>}>
                 {detailAsset ? (
                     <Flex vertical gap={14}>
                         <Flex gap={14} align="start">
@@ -257,14 +261,15 @@ export default function AdminAssetsPage() {
                         ) : null}
                         <Input.TextArea value={detailAsset.type === "text" ? detailAsset.content : detailAsset.url || detailAsset.coverUrl} rows={7} readOnly />
                         <Button icon={<CopyOutlined />} onClick={() => copyText(detailAsset.type === "text" ? detailAsset.content : detailAsset.url || detailAsset.coverUrl)}>
-                            复制内容
+                            
+                            {t("复制内容")}
                         </Button>
                     </Flex>
                 ) : null}
             </Modal>
 
             <Modal
-                title="删除素材"
+                title={t("删除素材")}
                 open={Boolean(deletingAsset)}
                 onCancel={() => setDeletingAsset(null)}
                 onOk={async () => {
@@ -272,19 +277,20 @@ export default function AdminAssetsPage() {
                     await deleteAsset(deletingAsset.id);
                     setDeletingAsset(null);
                 }}
-                okText="删除"
+                okText={t("删除")}
                 okButtonProps={{ danger: true }}
-                cancelText="取消"
+                cancelText={t("取消")}
             >
-                确定删除「{deletingAsset?.title}」吗？删除后会从服务器素材库中移除。
+                
+                {t("确定删除「")}{deletingAsset?.title}{t("」吗？删除后会从服务器素材库中移除。")}
             </Modal>
         </main>
     );
 }
 
 function assetTypeLabel(type: AdminAsset["type"]) {
-    if (type === "image") return "图片";
-    if (type === "video") return "视频";
-    if (type === "audio") return "音频";
-    return "文本";
+    if (type === "image") return t("图片");
+    if (type === "video") return t("视频");
+    if (type === "audio") return t("音频");
+    return t("文本");
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useState } from "react";
 import { Button, Modal, Segmented, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
@@ -31,8 +32,8 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
         <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={860} centered destroyOnHidden>
             <div className="space-y-5">
                 <div>
-                    <h2 className="text-xl font-semibold">AI 多角度</h2>
-                    <p className="mt-1 text-sm opacity-60">左侧只预览方向，结果会基于原图重新生成</p>
+                    <h2 className="text-xl font-semibold">{t("AI 多角度")}</h2>
+                    <p className="mt-1 text-sm opacity-60">{t("左侧只预览方向，结果会基于原图重新生成")}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
                     <div className="flex min-h-[300px] flex-col justify-between rounded-xl border p-4">
@@ -43,21 +44,22 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
                             </div>
                         </div>
                         <Button className="w-fit" icon={<RotateCcw className="size-4" />} onClick={() => setParams(defaultParams)}>
-                            重置
+                            
+                            {t("重置")}
                         </Button>
                     </div>
                     <div className="space-y-6 py-2">
-                        <AngleSlider label="左右角度" value={params.horizontalAngle} min={-60} max={60} step={1} suffix="deg" onChange={(value) => update("horizontalAngle", value)} />
-                        <AngleSlider label="俯仰角度" value={params.pitchAngle} min={-45} max={45} step={1} suffix="deg" onChange={(value) => update("pitchAngle", value)} />
-                        <AngleSlider label="镜头距离" value={params.cameraDistance} min={1} max={10} step={0.1} onChange={(value) => update("cameraDistance", value)} />
+                        <AngleSlider label={t("左右角度")} value={params.horizontalAngle} min={-60} max={60} step={1} suffix="deg" onChange={(value) => update("horizontalAngle", value)} />
+                        <AngleSlider label={t("俯仰角度")} value={params.pitchAngle} min={-45} max={45} step={1} suffix="deg" onChange={(value) => update("pitchAngle", value)} />
+                        <AngleSlider label={t("镜头距离")} value={params.cameraDistance} min={1} max={10} step={0.1} onChange={(value) => update("cameraDistance", value)} />
                         <div className="grid grid-cols-[88px_1fr_72px] items-center gap-4">
-                            <span className="font-medium opacity-75">广角镜头</span>
+                            <span className="font-medium opacity-75">{t("广角镜头")}</span>
                             <Segmented
                                 className="w-fit"
                                 value={params.wideAngle ? "wide" : "standard"}
                                 options={[
-                                    { label: "标准", value: "standard" },
-                                    { label: "广角", value: "wide" },
+                                    { label: t("标准"), value: "standard" },
+                                    { label: t("广角"), value: "wide" },
                                 ]}
                                 onChange={(value) => update("wideAngle", value === "wide")}
                             />
@@ -66,7 +68,8 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
                 </div>
                 <div className="flex justify-end">
                     <Button type="primary" size="large" icon={<WandSparkles className="size-4" />} onClick={() => onConfirm(params)}>
-                        AI 生成
+                        
+                        {t("AI 生成")}
                     </Button>
                 </div>
             </div>

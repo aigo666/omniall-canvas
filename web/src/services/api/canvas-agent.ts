@@ -8,6 +8,7 @@ import type { CanvasAgentProtocolMessage, CanvasAgentToolCall, CanvasAgentToolMo
 import type { CanvasAgentToolDefinition } from "@/app/(user)/canvas/agent/canvas-agent-tools";
 import { calibrateCanvasAgentTokenEstimate } from "@/app/(user)/canvas/agent/canvas-agent-memory";
 
+import { t } from "@/i18n";
 export type CanvasAgentModelTurn = {
     content: string;
     reasoningContent?: string;
@@ -148,8 +149,8 @@ export async function requestCanvasAgentTurn(input: RequestCanvasAgentTurnInput)
 
 export function canvasAgentSystemPrompt(config: AiConfig, prompt: string, jsonTools: CanvasAgentToolDefinition[] = [], nativeTools = false) {
     const configured = (config.systemPrompts.text || config.systemPrompt).trim();
-    if (nativeTools) prompt += "\n\n【原生工具回退信号】\n需要执行任何画布操作时必须返回原生工具调用；若本轮无法返回任何原生工具调用，只输出 " + CANVAS_AGENT_JSON_FALLBACK_SIGNAL + "，不得附加文字、Markdown 或声称已完成。仅咨询、解释、分析且无需执行画布操作时正常文字回答，禁止输出此信号。";
-    if (jsonTools.length) prompt += "\n\n【JSON 工具定义】\n当前画布执行器会解析并执行回复中的 actions。需要操作画布时必须直接返回合法的 actions JSON；接口没有原生 Tool Calling 不代表没有画布执行能力，不得因此拒绝执行或要求用户手动提交。所有工具参数都放在对应 action 的 arguments 中。\n" + JSON.stringify(jsonTools.map(({ function: tool }) => tool));
+    if (nativeTools) prompt += t("\n\n【原生工具回退信号】\n需要执行任何画布操作时必须返回原生工具调用；若本轮无法返回任何原生工具调用，只输出 ") + CANVAS_AGENT_JSON_FALLBACK_SIGNAL + t("，不得附加文字、Markdown 或声称已完成。仅咨询、解释、分析且无需执行画布操作时正常文字回答，禁止输出此信号。");
+    if (jsonTools.length) prompt += t("\n\n【JSON 工具定义】\n当前画布执行器会解析并执行回复中的 actions。需要操作画布时必须直接返回合法的 actions JSON；接口没有原生 Tool Calling 不代表没有画布执行能力，不得因此拒绝执行或要求用户手动提交。所有工具参数都放在对应 action 的 arguments 中。\n") + JSON.stringify(jsonTools.map(({ function: tool }) => tool));
     return configured ? configured + "\n\n" + prompt : prompt;
 }
 
@@ -164,7 +165,7 @@ export async function requestCanvasAgentCheckpoint(input: {
         systemPrompt: "你负责生成画布 Agent 的长期对话检查点。仅保留用户长期目标与偏好、已确认方案、不可改变要求、否决方向、未解决事项、重要节点 ID 的职责线索，以及当前 Skill 和阶段线索。节点是否存在、节点正文、任务状态必须以之后注入的真实画布和工具结果为准；不得声称工具或媒体已成功，不得保存 Base64。直接输出检查点正文，控制在 16000 Token 以内。",
         messages: [{
             role: "user",
-            content: `【旧检查点】\n${input.previousCheckpoint || "无"}\n\n【本次归档的完整旧轮次】\n${JSON.stringify(input.messages)}`,
+            content: `【旧检查点】\n${input.previousCheckpoint || t("无")}\n\n【本次归档的完整旧轮次】\n${JSON.stringify(input.messages)}`,
         }],
         tools: [],
         toolMode: "prompt-json",
@@ -247,9 +248,9 @@ async function requestCompletion(config: CanvasAgentAiConfig, systemPrompt: stri
             readErrorCode(payload),
         );
     }
-    if (!message) throw new CanvasAgentRequestError(readError(payload, response.status) || "文本模型没有返回内容", response.status);
+    if (!message) throw new CanvasAgentRequestError(readError(payload, response.status) || t("文本模型没有返回内容"), response.status);
     if (choice?.finish_reason && /^(?:length|content_filter|max_tokens)$/i.test(choice.finish_reason)) {
-        throw new CanvasAgentRequestError("文本模型输出未完成：" + choice.finish_reason, response.status);
+        throw new CanvasAgentRequestError(t("文本模型输出未完成：") + choice.finish_reason, response.status);
     }
     const normalizedModel = config.model.trim().toLowerCase();
     const preservesReasoningContent = normalizedModel.startsWith("glm-") || mimoTextModels.some((model) => model === normalizedModel);
@@ -327,11 +328,11 @@ async function requestResponsesCompletion(config: CanvasAgentAiConfig, systemPro
             readErrorCode(payload),
         );
     }
-    if (!result) throw new CanvasAgentRequestError(readError(payload, response.status) || "文本模型没有返回内容", response.status);
+    if (!result) throw new CanvasAgentRequestError(readError(payload, response.status) || t("文本模型没有返回内容"), response.status);
     const responseStatus = result.status?.toLowerCase();
     const incompleteReason = result.incomplete_details?.reason;
     if (incompleteReason || (responseStatus && ["incomplete", "failed", "cancelled", "in_progress", "queued"].includes(responseStatus))) {
-        throw new CanvasAgentRequestError("文本模型输出未完成：" + (responseStatus || incompleteReason) + (responseStatus && incompleteReason ? "（" + incompleteReason + "）" : ""), response.status);
+        throw new CanvasAgentRequestError(t("文本模型输出未完成：") + (responseStatus || incompleteReason) + (responseStatus && incompleteReason ? "（" + incompleteReason + "）" : ""), response.status);
     }
     const output = result.output || [];
     const toolCalls: CanvasAgentToolCall[] = [];
@@ -421,11 +422,11 @@ async function requestGeminiCompletion(config: CanvasAgentAiConfig, systemPrompt
     } else {
         ({ payload, rawText } = await readResponsePayload<Record<string, unknown>>(response));
     }
-    if (!response.ok) throw new CanvasAgentRequestError(geminiErrorMessage(payload, rawText || "文本模型请求失败"), response.status, geminiErrorCode(payload));
+    if (!response.ok) throw new CanvasAgentRequestError(geminiErrorMessage(payload, rawText || t("文本模型请求失败")), response.status, geminiErrorCode(payload));
     const candidates = Array.isArray(payload.candidates) ? payload.candidates as Array<Record<string, unknown>> : [];
     const incompleteReason = candidates.map((candidate) => candidate.finishReason).find((reason) => typeof reason === "string" && /^(?:MAX_TOKENS|SAFETY|RECITATION|BLOCKLIST|PROHIBITED_CONTENT|SPII|MALFORMED_FUNCTION_CALL|UNEXPECTED_TOOL_CALL|TOO_MANY_TOOL_CALLS)$/i.test(reason));
     if (typeof incompleteReason === "string") {
-        throw new CanvasAgentRequestError("文本模型输出未完成：" + incompleteReason, response.status);
+        throw new CanvasAgentRequestError(t("文本模型输出未完成：") + incompleteReason, response.status);
     }
     const parts = candidates.flatMap((candidate) => {
         const content = candidate.content && typeof candidate.content === "object" ? candidate.content as Record<string, unknown> : {};
@@ -543,7 +544,7 @@ function parseToolArguments(value: unknown): Pick<CanvasAgentToolCall, "argument
 }
 
 function readError(payload: AiErrorPayload, status: number, rawText = "") {
-    return payload.error?.message || payload.msg || rawText || (status ? "文本模型请求失败：" + status : "文本模型请求失败");
+    return payload.error?.message || payload.msg || rawText || (status ? t("文本模型请求失败：") + status : t("文本模型请求失败"));
 }
 
 function readErrorCode(payload: AiErrorPayload) {
@@ -568,7 +569,7 @@ async function readCanvasAgentStream(response: Response, onEvent: (event: Record
                 code = readErrorCode(detail) || geminiErrorCode(detail);
             } catch { /* 保留原始错误信息 */ }
         }
-        throw new CanvasAgentRequestError(error instanceof Error ? error.message : "流式响应读取失败", response.status, code);
+        throw new CanvasAgentRequestError(error instanceof Error ? error.message : t("流式响应读取失败"), response.status, code);
     }
 }
 

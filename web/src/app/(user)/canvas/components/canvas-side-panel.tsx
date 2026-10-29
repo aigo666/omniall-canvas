@@ -1,7 +1,8 @@
 "use client";
 
+import { t } from "@/i18n";
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Empty, Input, Pagination, Select, Spin } from "antd";
+import { Empty, Input, Pagination, Popover, Select, Spin } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, ChevronRight, Clapperboard, Eye, FileText, Group, Image as ImageIcon, Music2, Plus, Search, Settings2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
@@ -66,23 +67,23 @@ const NODE_TYPE_LABEL = {
 };
 
 const NODE_FILTER_OPTIONS = [
-    { label: "全部", value: "all" },
-    { label: "图片", value: CanvasNodeType.Image },
-    { label: "全景图", value: CanvasNodeType.Panorama },
-    { label: "文本", value: CanvasNodeType.Text },
-    { label: "配置", value: CanvasNodeType.Config },
-    { label: "视频", value: CanvasNodeType.Video },
-    { label: "音频", value: CanvasNodeType.Audio },
-    { label: "导演台", value: CanvasNodeType.Director },
-    { label: "组", value: CanvasNodeType.Group },
+    { get label() { return t("全部"); }, value: "all" },
+    { get label() { return t("图片"); }, value: CanvasNodeType.Image },
+    { get label() { return t("全景图"); }, value: CanvasNodeType.Panorama },
+    { get label() { return t("文本"); }, value: CanvasNodeType.Text },
+    { get label() { return t("配置"); }, value: CanvasNodeType.Config },
+    { get label() { return t("视频"); }, value: CanvasNodeType.Video },
+    { get label() { return t("音频"); }, value: CanvasNodeType.Audio },
+    { get label() { return t("导演台"); }, value: CanvasNodeType.Director },
+    { get label() { return t("组"); }, value: CanvasNodeType.Group },
 ];
 
 const ASSET_TYPE_OPTIONS = [
-    { label: "全部", value: "" },
-    { label: "文本", value: "text" },
-    { label: "图片", value: "image" },
-    { label: "视频", value: "video" },
-    { label: "音频", value: "audio" },
+    { get label() { return t("全部"); }, value: "" },
+    { get label() { return t("文本"); }, value: "text" },
+    { get label() { return t("图片"); }, value: "image" },
+    { get label() { return t("视频"); }, value: "video" },
+    { get label() { return t("音频"); }, value: "audio" },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -146,9 +147,9 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthCh
                 data-canvas-no-zoom
             >
                 <div className="flex items-center gap-5 px-4 pt-3.5">
-                    <PanelTabButton label="画布" active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
-                    <PanelTabButton label="资产" active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
-                    <PanelTabButton label="提示词库" active={tab === "prompts"} theme={theme} onClick={() => setTab("prompts")} />
+                    <PanelTabButton label={t("画布")} active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
+                    <PanelTabButton label={t("资产")} active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
+                    <PanelTabButton label={t("提示词库")} active={tab === "prompts"} theme={theme} onClick={() => setTab("prompts")} />
                 </div>
                 <div className="mt-2 min-h-0 flex-1 overflow-hidden">
                     {tab === "canvas" ? (
@@ -159,7 +160,7 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthCh
                         <CanvasPromptsTab theme={theme} onInsert={onInsertAsset} />
                     )}
                 </div>
-                <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label="调整左侧面板宽度" />
+                <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label={t("调整左侧面板宽度")} />
             </motion.aside>
         </motion.div>
     );
@@ -212,12 +213,12 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
     return (
         <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 px-3 pb-2.5 pt-1">
-                <span className="text-xs font-medium opacity-60">画布元素</span>
+                <span className="text-xs font-medium opacity-60">{t("画布元素")}</span>
                 <span className="text-xs opacity-35">{nodes.length}</span>
                 <Select size="small" variant="borderless" className="w-auto" popupMatchSelectWidth={false} value={typeFilter} onChange={setTypeFilter} options={NODE_FILTER_OPTIONS} />
             </div>
             <div className="px-3 pb-2.5">
-                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder="搜索节点" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder={t("搜索节点")} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
                 {treeRows.length ? (
@@ -246,7 +247,7 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
                                             {hasImage ? <img src={node.metadata?.content} alt={node.title} className="size-full object-cover" /> : <Icon className="size-5 opacity-60" />}
                                         </span>
                                         <span className="min-w-0 flex-1 space-y-0.5">
-                                            <span className="block truncate text-sm font-medium leading-snug">{node.title || NODE_TYPE_LABEL[node.type] || "未命名节点"}</span>
+                                            <span className="block truncate text-sm font-medium leading-snug">{node.title || NODE_TYPE_LABEL[node.type] || t("未命名节点")}</span>
                                             <span className="block truncate text-xs leading-snug opacity-50">{node.type === CanvasNodeType.Text ? node.metadata?.content || node.metadata?.prompt || "" : NODE_TYPE_LABEL[node.type] || node.type}</span>
                                         </span>
                                         {node.metadata?.status && node.metadata.status !== "idle" ? <span className="size-1.5 shrink-0 rounded-full" style={{ background: STATUS_COLOR[node.metadata.status] || "transparent" }} /> : null}
@@ -256,7 +257,7 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
                         })}
                     </div>
                 ) : (
-                    <div className="pt-16 text-center text-sm opacity-40">{nodes.length ? "无匹配节点" : "画布暂无节点"}</div>
+                    <div className="pt-16 text-center text-sm opacity-40">{nodes.length ? t("无匹配节点") : t("画布暂无节点")}</div>
                 )}
             </div>
         </div>
@@ -270,8 +271,8 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart,
     return (
         <div className="flex h-full flex-col">
             <div className="flex items-center gap-4 px-3 pb-2 pt-1">
-                <AssetSourceTab label="我的素材" active={source === "mine"} theme={theme} onClick={() => setSource("mine")} />
-                <AssetSourceTab label="素材库" active={source === "library"} theme={theme} onClick={() => setSource("library")} />
+                <AssetSourceTab label={t("我的素材")} active={source === "mine"} theme={theme} onClick={() => setSource("mine")} />
+                <AssetSourceTab label={t("素材库")} active={source === "library"} theme={theme} onClick={() => setSource("library")} />
             </div>
             {source === "mine" ? (
                 <MyAssetsTab theme={theme} onAdd={() => setFormOpen(true)} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
@@ -317,23 +318,24 @@ function MyAssetsTab({ theme, onAdd, onAssetDragStart, onAssetDragEnd }: { theme
             </div>
             <div className="grid grid-cols-2 gap-2 px-3 pb-2">
                 <div className="min-w-0">
-                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>分类</div>
-                    <Select size="small" className="w-full" value={category} onChange={setCategory} options={[{ label: "全部", value: "" }, ...categories.map((item) => ({ label: item, value: item }))]} />
+                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>{t("分类")}</div>
+                    <Select size="small" className="w-full" value={category} onChange={setCategory} options={[{ label: t("全部"), value: "" }, ...categories.map((item) => ({ label: item, value: item }))]} />
                 </div>
                 <div className="min-w-0">
-                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>标签</div>
-                    <Select mode="multiple" size="small" className="w-full" value={selectedTags} placeholder="全部" allowClear maxTagCount={1} onChange={(values) => setSelectedTags(values.includes("") ? [] : values)} options={[{ label: "全部", value: "" }, ...tags.map((tag) => ({ label: tag, value: tag }))]} />
+                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>{t("标签")}</div>
+                    <Select mode="multiple" size="small" className="w-full" value={selectedTags} placeholder={t("全部")} allowClear maxTagCount={1} onChange={(values) => setSelectedTags(values.includes("") ? [] : values)} options={[{ label: t("全部"), value: "" }, ...tags.map((tag) => ({ label: tag, value: tag }))]} />
                 </div>
             </div>
             <div className="flex items-center gap-2 px-3 pb-2">
-                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder="搜索素材" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder={t("搜索素材")} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
                 <button type="button" onClick={onAdd} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }}>
                     <Plus className="size-3.5" />
-                    添加
+                    
+                    {t("添加")}
                 </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                {filtered.length ? <div className="grid grid-cols-2 gap-2 px-1 pt-1">{items.map((asset) => <AssetDragCard key={asset.id} asset={asset} theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无素材" className="pt-16" />}
+                {filtered.length ? <div className="grid grid-cols-2 gap-2 px-1 pt-1">{items.map((asset) => <AssetDragCard key={asset.id} asset={asset} theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("暂无素材")} className="pt-16" />}
                 {filtered.length > ASSET_PAGE_SIZE ? <Pagination className="!mt-3 flex justify-center" size="small" current={page} pageSize={ASSET_PAGE_SIZE} total={filtered.length} showSizeChanger={false} onChange={setPage} /> : null}
             </div>
         </>
@@ -361,20 +363,20 @@ function LibraryAssetsTab({ theme, onAssetDragStart, onAssetDragEnd }: { theme: 
         <>
             <div className="grid grid-cols-2 gap-2 px-3 pb-2">
                 <div className="min-w-0">
-                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>分类</div>
-                    <Select size="small" className="w-full" value={category} onChange={setCategory} options={[{ label: "全部", value: "" }, ...categories.map((item) => ({ label: item, value: item }))]} />
+                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>{t("分类")}</div>
+                    <Select size="small" className="w-full" value={category} onChange={setCategory} options={[{ label: t("全部"), value: "" }, ...categories.map((item) => ({ label: item, value: item }))]} />
                 </div>
                 <div className="min-w-0">
-                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>标签</div>
-                    <Select mode="multiple" size="small" className="w-full" value={selectedTags} placeholder="全部" allowClear maxTagCount={1} onChange={(values) => setSelectedTags(values.includes("") ? [] : values)} options={[{ label: "全部", value: "" }, ...tags.map((tag) => ({ label: tag, value: tag }))]} />
+                    <div className="mb-1 text-xs opacity-50" style={{ color: theme.node.text }}>{t("标签")}</div>
+                    <Select mode="multiple" size="small" className="w-full" value={selectedTags} placeholder={t("全部")} allowClear maxTagCount={1} onChange={(values) => setSelectedTags(values.includes("") ? [] : values)} options={[{ label: t("全部"), value: "" }, ...tags.map((tag) => ({ label: tag, value: tag }))]} />
                 </div>
             </div>
             <div className="flex items-center gap-2 px-3 pb-2">
-                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder="搜索素材" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder={t("搜索素材")} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
                 <Select size="small" variant="borderless" className="w-16" value={type} onChange={setType} options={ASSET_TYPE_OPTIONS} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                {query.isLoading ? <div className="flex justify-center pt-16"><Spin size="small" /></div> : items.length ? <div className="grid grid-cols-2 gap-2 px-1 pt-1">{items.map((asset) => <LibraryAssetDragCard key={asset.id} asset={asset} theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无素材" className="pt-16" />}
+                {query.isLoading ? <div className="flex justify-center pt-16"><Spin size="small" /></div> : items.length ? <div className="grid grid-cols-2 gap-2 px-1 pt-1">{items.map((asset) => <LibraryAssetDragCard key={asset.id} asset={asset} theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("暂无素材")} className="pt-16" />}
                 {query.data?.total && query.data.total > ASSET_PAGE_SIZE ? <Pagination className="!mt-3 flex justify-center" size="small" current={page} pageSize={ASSET_PAGE_SIZE} total={query.data.total} showSizeChanger={false} onChange={setPage} /> : null}
             </div>
         </>
@@ -437,7 +439,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert }: { t
     return (
         <div className="flex h-full flex-col">
             <div className="px-3 pb-2.5 pt-1">
-                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder="搜索提示词" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+                <Input size="small" allowClear prefix={<Search className="size-3.5 text-stone-400" />} placeholder={t("搜索提示词")} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
                 {categoryQuery.isLoading ? <div className="flex justify-center pt-16"><Spin size="small" /></div> : (
@@ -449,7 +451,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert }: { t
                     </div>
                 )}
             </div>
-            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, "已复制提示词")} />
+            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, t("已复制提示词"))} />
         </div>
     );
 });
@@ -469,7 +471,7 @@ async function fetchPromptCategory(category: string) {
 }
 
 function PromptGroup({ category, keyword, open, theme, onToggle, onView, onInsert }: { category: string; keyword: string; open: boolean; theme: CanvasTheme; onToggle: () => void; onView: (prompt: Prompt) => void; onInsert: (payload: InsertAssetPayload) => void }) {
-    const label = category === "system" ? "系统提示词" : category;
+    const label = category === "system" ? t("系统提示词") : category;
     const query = useQuery({
         queryKey: ["canvas-side-prompt-category", category],
         queryFn: () => fetchPromptCategory(category),
@@ -495,12 +497,13 @@ function PromptGroup({ category, keyword, open, theme, onToggle, onView, onInser
                 <div className="space-y-1.5 px-1 pb-2 pt-1">
                     {query.isLoading ? <div className="flex justify-center py-6"><Spin size="small" /></div> : query.isError ? (
                         <button type="button" onClick={() => void query.refetch()} className="block w-full py-4 text-center text-xs text-red-500 opacity-80 transition hover:opacity-100">
-                            加载失败，点击重试
+                            
+                            {t("加载失败，点击重试")}
                         </button>
                     ) : items.length ? (
                         items.map((item) => <PromptRow key={item.id} item={item} theme={theme} onView={() => onView(item)} onInsert={() => onInsert({ kind: "text", content: item.prompt, title: item.title })} />)
                     ) : (
-                        <div className="py-4 text-center text-xs opacity-40">{category === "system" ? "暂无提示词" : "该分类暂无提示词"}</div>
+                        <div className="py-4 text-center text-xs opacity-40">{category === "system" ? t("暂无提示词") : t("该分类暂无提示词")}</div>
                     )}
                 </div>
             ) : null}
@@ -508,18 +511,66 @@ function PromptGroup({ category, keyword, open, theme, onToggle, onView, onInser
     );
 }
 
-function PromptRow({ item, theme, onView, onInsert }: { item: Prompt; theme: CanvasTheme; onView: () => void; onInsert: () => void }) {
+function PromptRowDetail({ item, theme }: { item: Prompt; theme: CanvasTheme }) {
     return (
-        <div className="group relative flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-black/5 dark:hover:bg-white/5">
-            {item.coverUrl ? <img src={item.coverUrl} alt="" className="size-10 shrink-0 rounded-md object-cover" loading="lazy" /> : <span className="grid size-10 shrink-0 place-items-center rounded-md" style={{ background: theme.node.panel }}><FileText className="size-4 opacity-50" /></span>}
-            <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-sm font-medium leading-snug">{item.title}</span>
-                <span className="mt-0.5 block truncate text-xs leading-snug opacity-50">{item.prompt}</span>
-            </button>
-            <div className="flex shrink-0 flex-col items-center gap-0.5">
-                <button type="button" onClick={onView} className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10" aria-label="查看详情"><Eye className="size-3.5" /></button>
-                <button type="button" onClick={onInsert} className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10" style={{ color: theme.toolbar.activeText }} aria-label="插入画布"><Plus className="size-3.5" /></button>
-            </div>
+        <div className="w-[320px] max-w-[calc(100vw-48px)]" onPointerDown={(event) => event.stopPropagation()}>
+            {item.coverUrl ? (
+                <div className="mb-3 overflow-hidden rounded-xl border" style={{ borderColor: theme.node.stroke, background: theme.node.fill }}>
+                    <img src={item.coverUrl} alt="" className="aspect-[16/10] w-full object-cover" />
+                </div>
+            ) : null}
+            <div className="text-sm font-semibold leading-5">{item.title}</div>
+            {item.tags?.length ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                    {item.tags.slice(0, 6).map((tag) => (
+                        <span key={tag} className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: theme.node.fill, color: theme.node.muted }}>
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+            <div className="thin-scrollbar mt-3 max-h-[220px] overflow-y-auto whitespace-pre-wrap text-xs leading-5 opacity-80">{item.prompt || item.preview || t("暂无提示词内容")}</div>
         </div>
+    );
+}
+
+function PromptRow({ item, theme, onView, onInsert }: { item: Prompt; theme: CanvasTheme; onView: () => void; onInsert: () => void }) {
+    const [detailOpen, setDetailOpen] = useState(false);
+
+    return (
+        <Popover
+            open={detailOpen}
+            placement="rightTop"
+            trigger={[]}
+            mouseEnterDelay={0.08}
+            mouseLeaveDelay={0.12}
+            content={<PromptRowDetail item={item} theme={theme} />}
+            styles={{
+                container: {
+                    padding: 14,
+                    background: theme.toolbar.panel,
+                    color: theme.node.text,
+                    border: `1px solid ${theme.node.stroke}`,
+                    borderRadius: 16,
+                    boxShadow: "0 12px 40px rgba(0,0,0,.35)",
+                },
+            }}
+        >
+            <div
+                className="group relative flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-black/5 dark:hover:bg-white/5"
+                onMouseEnter={() => setDetailOpen(true)}
+                onMouseLeave={() => setDetailOpen(false)}
+            >
+                {item.coverUrl ? <img src={item.coverUrl} alt="" className="size-10 shrink-0 rounded-md object-cover" loading="lazy" /> : <span className="grid size-10 shrink-0 place-items-center rounded-md" style={{ background: theme.node.panel }}><FileText className="size-4 opacity-50" /></span>}
+                <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
+                    <span className="block truncate text-sm font-medium leading-snug">{item.title}</span>
+                    <span className="mt-0.5 block truncate text-xs leading-snug opacity-50">{item.prompt}</span>
+                </button>
+                <div className="flex shrink-0 flex-col items-center gap-0.5">
+                    <button type="button" onClick={onView} className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("查看详情")}><Eye className="size-3.5" /></button>
+                    <button type="button" onClick={onInsert} className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10" style={{ color: theme.toolbar.activeText }} aria-label={t("插入画布")}><Plus className="size-3.5" /></button>
+                </div>
+            </div>
+        </Popover>
     );
 }

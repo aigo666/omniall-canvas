@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Select } from "antd";
 import { type ReactNode } from "react";
 
@@ -33,7 +34,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
     return (
         <ImageSettingsTheme theme={theme}>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
-                {showTitle ? <div className="text-lg font-semibold">音频设置</div> : null}
+                {showTitle ? <div className="text-lg font-semibold">{t("音频设置")}</div> : null}
                 {gemini ? <GeminiAudioSettings config={config} onConfigChange={onConfigChange} theme={theme} /> : isMimoTtsModel(model) ? <MiMoAudioSettings config={config} model={model} onConfigChange={onConfigChange} theme={theme} /> : <AudioSpeechSettings config={config} model={model} glm={isGlmTtsModel(model)} grok={grok} onConfigChange={onConfigChange} theme={theme} />}
             </div>
         </ImageSettingsTheme>
@@ -42,7 +43,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
 
 function GeminiAudioSettings({ config, onConfigChange, theme }: { config: AiConfig; onConfigChange: AudioSettingsPanelProps["onConfigChange"]; theme: CanvasTheme }) {
     return (
-        <SettingGroup title="声音" color={theme.node.muted}>
+        <SettingGroup title={t("声音")} color={theme.node.muted}>
             <Select className="w-full" showSearch optionFilterProp="label" value={normalizeGeminiTtsVoice(config.geminiTtsVoice)} options={geminiTtsVoiceOptions} onChange={(value) => onConfigChange("geminiTtsVoice", value)} />
         </SettingGroup>
     );
@@ -54,7 +55,7 @@ function MiMoAudioSettings({ config, model, onConfigChange, theme }: { config: A
     return (
         <>
             {isMimoPresetTtsModel(model) ? (
-                <SettingGroup title="声音" color={theme.node.muted}>
+                <SettingGroup title={t("声音")} color={theme.node.muted}>
                     <div className="grid grid-cols-4 gap-2.5">
                         {mimoTtsVoiceOptions.map((item) => (
                             <OptionPill key={item.value} selected={normalizeMimoTtsVoice(config.mimoTtsVoice) === item.value} theme={theme} onClick={() => onConfigChange("mimoTtsVoice", item.value)}>
@@ -65,10 +66,10 @@ function MiMoAudioSettings({ config, model, onConfigChange, theme }: { config: A
                 </SettingGroup>
             ) : null}
             {isMimoVoiceDesignModel(model) ? (
-                <SettingGroup title="音色描述" color={theme.node.muted}>
+                <SettingGroup title={t("音色描述")} color={theme.node.muted}>
                     <textarea
                         value={config.mimoVoiceDesignPrompt || ""}
-                        placeholder="例如：年轻女性，声音清亮自然，有亲和力。"
+                        placeholder={t("例如：年轻女性，声音清亮自然，有亲和力。")}
                         className="thin-scrollbar h-24 w-full resize-none rounded-xl border bg-transparent px-3 py-2 text-sm leading-5 outline-none"
                         style={{ borderColor: theme.node.stroke, color: theme.node.text }}
                         onChange={(event) => onConfigChange("mimoVoiceDesignPrompt", event.target.value)}
@@ -76,7 +77,7 @@ function MiMoAudioSettings({ config, model, onConfigChange, theme }: { config: A
                     />
                 </SettingGroup>
             ) : null}
-            <SettingGroup title="格式" color={theme.node.muted}>
+            <SettingGroup title={t("格式")} color={theme.node.muted}>
                 <div className="grid grid-cols-3 gap-2.5">
                     {mimoTtsFormatOptions.map((item) => (
                         <OptionPill key={item.value} selected={format === item.value} theme={theme} onClick={() => onConfigChange("mimoTtsFormat", item.value)}>
@@ -86,10 +87,10 @@ function MiMoAudioSettings({ config, model, onConfigChange, theme }: { config: A
                 </div>
             </SettingGroup>
             {isMimoPresetTtsModel(model) || isMimoVoiceCloneModel(model) ? (
-                <SettingGroup title="声音指令" color={theme.node.muted}>
+                <SettingGroup title={t("声音指令")} color={theme.node.muted}>
                     <textarea
                         value={config.audioInstructions || ""}
-                        placeholder="例如：语速轻快，语气兴奋，结尾略微上扬。"
+                        placeholder={t("例如：语速轻快，语气兴奋，结尾略微上扬。")}
                         className="thin-scrollbar h-20 w-full resize-none rounded-xl border bg-transparent px-3 py-2 text-sm leading-5 outline-none"
                         style={{ borderColor: theme.node.stroke, color: theme.node.text }}
                         onChange={(event) => onConfigChange("audioInstructions", event.target.value)}
@@ -113,7 +114,7 @@ function AudioSpeechSettings({ config, model, glm, grok, onConfigChange, theme }
 
     return (
         <>
-            <SettingGroup title="声音" color={theme.node.muted}>
+            <SettingGroup title={t("声音")} color={theme.node.muted}>
                 {grok ? <GrokTtsVoiceSelect config={config} model={model} value={voice} onChange={(value) => onConfigChange("grokTtsVoice", value)} /> : (
                     <div className="grid grid-cols-3 gap-2.5">
                         {voiceOptions.map((item) => (
@@ -125,11 +126,11 @@ function AudioSpeechSettings({ config, model, glm, grok, onConfigChange, theme }
                 )}
             </SettingGroup>
             {grok ? (
-                <SettingGroup title="语言" color={theme.node.muted}>
+                <SettingGroup title={t("语言")} color={theme.node.muted}>
                     <Select className="w-full" value={normalizeGrokTtsLanguage(config.grokTtsLanguage)} options={grokTtsLanguageOptions} showSearch optionFilterProp="label" onChange={(value) => onConfigChange("grokTtsLanguage", value)} />
                 </SettingGroup>
             ) : null}
-            <SettingGroup title="格式" color={theme.node.muted}>
+            <SettingGroup title={t("格式")} color={theme.node.muted}>
                 <div className="grid grid-cols-3 gap-2.5">
                     {formatOptions.map((item) => (
                         <OptionPill key={item.value} selected={format === item.value} theme={theme} onClick={() => onConfigChange(formatKey, item.value)}>
@@ -138,7 +139,7 @@ function AudioSpeechSettings({ config, model, glm, grok, onConfigChange, theme }
                     ))}
                 </div>
             </SettingGroup>
-            <SettingGroup title="语速" color={theme.node.muted}>
+            <SettingGroup title={t("语速")} color={theme.node.muted}>
                 <div className="grid grid-cols-4 gap-2.5">
                     {speedOptions.map((value) => (
                         <OptionPill key={value} selected={speed === value} theme={theme} onClick={() => onConfigChange(speedKey, value)}>
@@ -160,10 +161,10 @@ function AudioSpeechSettings({ config, model, glm, grok, onConfigChange, theme }
                 />
             </SettingGroup>
             {!glm && !grok ? (
-                <SettingGroup title="声音指令" color={theme.node.muted}>
+                <SettingGroup title={t("声音指令")} color={theme.node.muted}>
                     <textarea
                         value={config.audioInstructions || ""}
-                        placeholder="例如：自然、温暖、适合旁白。"
+                        placeholder={t("例如：自然、温暖、适合旁白。")}
                         className="thin-scrollbar h-20 w-full resize-none rounded-xl border bg-transparent px-3 py-2 text-sm leading-5 outline-none"
                         style={{ borderColor: theme.node.stroke, color: theme.node.text }}
                         onChange={(event) => onConfigChange("audioInstructions", event.target.value)}

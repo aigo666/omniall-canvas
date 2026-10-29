@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import { nanoid } from "nanoid";
 
 import type { UserWebDAVStorageProvider } from "@/services/image-storage";
@@ -189,13 +191,13 @@ async function directWebDAVDirectoryExists(provider: UserWebDAVStorageProvider, 
 function webDAVResponseError(response: Response, message: string) {
     const detail =
         response.status === 401
-            ? "认证失败"
+            ? t("认证失败")
             : response.status === 403
-              ? "没有操作权限"
+              ? t("没有操作权限")
               : response.status === 404
-                ? "文件或目录不存在"
+                ? t("文件或目录不存在")
                 : response.status === 405
-                  ? "当前操作不受支持"
+                  ? t("当前操作不受支持")
                   : `HTTP ${response.status}`;
     return Object.assign(new Error(`${message}：${detail}`), { status: response.status });
 }

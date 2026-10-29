@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 export const MIMO_PROTOCOL = "mimo" as const;
 
 export const mimoTextModels = ["mimo-v2.5", "mimo-v2.5-pro"] as const;
@@ -46,7 +47,7 @@ export function isMimoChannel(channel?: { protocol?: string; baseUrl?: string } 
 }
 
 export function normalizeMimoTtsVoice(value: string) {
-    return mimoTtsVoiceOptions.some((item) => item.value === value) ? value : "冰糖";
+    return mimoTtsVoiceOptions.some((item) => item.value === value) ? value : t("冰糖");
 }
 
 export function normalizeMimoTtsFormat(value: string) {

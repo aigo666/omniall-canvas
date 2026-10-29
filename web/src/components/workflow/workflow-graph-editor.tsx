@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { WorkflowFieldMappingEditor } from "@/components/workflow/workflow-field-mapping-editor";
 import type { WorkflowFieldMapping, WorkflowGraphPreview } from "@/lib/workflow-channel";
 
+import { t } from "@/i18n";
 type WorkflowNode = {
     id: string;
     title: string;
@@ -142,52 +143,54 @@ export function WorkflowGraphEditor({ workflowJson, workflowGraph, fields, onCha
             <aside className="workflow-graph-sidebar">
                 <div className="workflow-graph-summary">
                     <span>
-                        <small>节点</small>
+                        <small>{t("节点")}</small>
                         <strong>{graph.nodes.length}</strong>
                     </span>
                     <span>
-                        <small>字段</small>
+                        <small>{t("字段")}</small>
                         <strong>
                             {enabledFields.length} / {fields.length}
                         </strong>
                     </span>
                     <span>
-                        <small>素材</small>
+                        <small>{t("素材")}</small>
                         <strong>{mediaFieldCount(enabledFields)}</strong>
                     </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                     <Button size="small" type="text" icon={<PowerOff className="size-3.5" />} danger disabled={disabled || enabledControllableCount === 0} onClick={() => updateAllFields(false)}>
-                        关闭全部开关
+                        
+                        {t("关闭全部开关")}
                     </Button>
                     <Button size="small" type="text" icon={<Power className="size-3.5" />} disabled={disabled || enabledControllableCount === controllableFields.length} onClick={() => updateAllFields(true)}>
-                        开启全部开关
+                        
+                        {t("开启全部开关")}
                     </Button>
                 </div>
                 <label className="workflow-graph-node-select">
-                    <span>正在设置的节点</span>
+                    <span>{t("正在设置的节点")}</span>
                     <Select
                         showSearch
                         value={selectedNodeId || undefined}
-                        placeholder="选择节点"
+                        placeholder={t("选择节点")}
                         optionFilterProp="label"
                         options={[{ label: `全部已开启字段 · ${enabledFields.length}`, value: allEnabledFieldsNodeId }, ...graph.nodes.map((node) => ({ label: `${node.title} · #${node.id}`, value: node.id }))]}
                         onChange={setSelectedNodeId}
                     />
                 </label>
                 <div className="workflow-graph-selected-heading">
-                    <strong>{selectedNodeId === allEnabledFieldsNodeId ? "全部已开启字段" : selectedNode?.title || "工作流字段"}</strong>
-                    <span>{selectedNodeId === allEnabledFieldsNodeId ? `${enabledFields.length} 个字段` : selectedNode ? `${selectedNode.classType} · #${selectedNode.id}` : "选择右侧节点进行设置"}</span>
+                    <strong>{selectedNodeId === allEnabledFieldsNodeId ? t("全部已开启字段") : selectedNode?.title || t("工作流字段")}</strong>
+                    <span>{selectedNodeId === allEnabledFieldsNodeId ? `${enabledFields.length} 个字段` : selectedNode ? `${selectedNode.classType} · #${selectedNode.id}` : t("选择右侧节点进行设置")}</span>
                 </div>
                 <WorkflowFieldMappingEditor fields={selectedFields} disabled={disabled} onChange={updateSelectedFields} />
             </aside>
 
             <section className="workflow-graph-stage">
                 <div className="workflow-graph-controls">
-                    <Button size="small" type="text" icon={<ZoomOut />} aria-label="缩小工作流" onClick={() => zoom(-1)} />
+                    <Button size="small" type="text" icon={<ZoomOut />} aria-label={t("缩小工作流")} onClick={() => zoom(-1)} />
                     <span>{Math.round(scale * 100)}%</span>
-                    <Button size="small" type="text" icon={<ZoomIn />} aria-label="放大工作流" onClick={() => zoom(1)} />
-                    <Button size="small" type="text" icon={<Maximize />} aria-label="适应窗口" onClick={fitGraph} />
+                    <Button size="small" type="text" icon={<ZoomIn />} aria-label={t("放大工作流")} onClick={() => zoom(1)} />
+                    <Button size="small" type="text" icon={<Maximize />} aria-label={t("适应窗口")} onClick={fitGraph} />
                 </div>
                 <div
                     ref={viewportRef}

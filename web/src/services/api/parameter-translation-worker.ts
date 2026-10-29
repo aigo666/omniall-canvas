@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 // 每次调用独立保存配置和函数；主线程为每次同步求值设置一秒上限。
 export {};
 
@@ -8,11 +9,11 @@ const methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const select = (selector: Selector, value: unknown) => {
     if (typeof selector === "function") {
         const result = selector(value);
-        if (result && typeof (result as Promise<unknown>).then === "function") throw new Error("响应提取函数必须同步返回结果");
+        if (result && typeof (result as Promise<unknown>).then === "function") throw new Error(t("响应提取函数必须同步返回结果"));
         return result;
     }
     if (selector === undefined || selector === null || selector === "") return value;
-    if (typeof selector !== "string") throw new Error("响应提取必须是字段路径或同步函数");
+    if (typeof selector !== "string") throw new Error(t("响应提取必须是字段路径或同步函数"));
     return selector.split(".").reduce<unknown>((result, field) => (result != null ? (result as Record<string, unknown>)[field] : undefined), value);
 };
 
@@ -24,15 +25,15 @@ self.onmessage = (event: MessageEvent) => {
             root = new Function(...names, `"use strict"; return (${code});`)(...names.map((name: string) => variables[name]));
             rule = root.rule as Rule;
             const configuredPoll = rule.poll === undefined ? root.poll : rule.poll;
-            if (configuredPoll !== undefined && configuredPoll !== false && (!configuredPoll || typeof configuredPoll !== "object" || Array.isArray(configuredPoll))) throw new Error("poll 必须是查询配置对象或 false");
+            if (configuredPoll !== undefined && configuredPoll !== false && (!configuredPoll || typeof configuredPoll !== "object" || Array.isArray(configuredPoll))) throw new Error(t("poll 必须是查询配置对象或 false"));
             poll = configuredPoll ? (configuredPoll as Rule) : undefined;
-            if (poll && (poll.taskId === undefined || poll.status === undefined || !Array.isArray(poll.success) || !poll.success.length)) throw new Error("任务查询需要 taskId、status 和非空 success 状态值");
-            if (poll?.failure !== undefined && !Array.isArray(poll.failure)) throw new Error("failure 必须是状态值数组");
+            if (poll && (poll.taskId === undefined || poll.status === undefined || !Array.isArray(poll.success) || !poll.success.length)) throw new Error(t("任务查询需要 taskId、status 和非空 success 状态值"));
+            if (poll?.failure !== undefined && !Array.isArray(poll.failure)) throw new Error(t("failure 必须是状态值数组"));
             result = Boolean(poll);
         } else if (action === "request") {
             const current = query ? poll : rule;
             const configured = methods.filter((method) => current?.[method] !== undefined);
-            if (configured.length !== 1) throw new Error("必须填写且仅填写一种请求方法");
+            if (configured.length !== 1) throw new Error(t("必须填写且仅填写一种请求方法"));
             result = { method: configured[0], request: current![configured[0]], headers: root.headers || {} };
         } else if (action === "error") {
             result = rule.error ? select(rule.error as Selector, data) : (data as { error?: { message?: string }; msg?: string })?.error?.message || (data as { msg?: string })?.msg || (typeof data === "string" ? data : undefined);
@@ -52,15 +53,15 @@ self.onmessage = (event: MessageEvent) => {
             } else if (poll) {
                 const ids = select(poll.taskId as Selector, data);
                 const values = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
-                if (values.some((id) => typeof id !== "string" && typeof id !== "number")) throw new Error("任务 ID 必须是字符串、数字或它们的数组");
+                if (values.some((id) => typeof id !== "string" && typeof id !== "number")) throw new Error(t("任务 ID 必须是字符串、数字或它们的数组"));
                 const taskIds = [...new Set(values.map(String))];
-                if (!taskIds.length) throw new Error("提交响应没有返回配置位置的任务 ID");
+                if (!taskIds.length) throw new Error(t("提交响应没有返回配置位置的任务 ID"));
                 result = { status: "processing", progress: 0, taskIds };
             } else result = { status: "completed", progress: 100, value: select(rule.result as Selector, data) };
         }
         self.postMessage({ result: result === undefined ? undefined : JSON.parse(JSON.stringify(result)) });
     } catch (error) {
-        self.postMessage({ error: error instanceof Error ? error.message : "自定配置求值失败" });
+        self.postMessage({ error: error instanceof Error ? error.message : t("自定配置求值失败") });
     }
 };
 

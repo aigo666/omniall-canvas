@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { CheckCircleOutlined, DeleteOutlined, FormatPainterOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
@@ -54,7 +55,7 @@ const emptySettings: AdminSettings = {
     },
     private: { channels: [], promptSync: { enabled: true, cron: "0 0 * * *" }, aiLog: { localDirectReportEnabled: false, cleanup: { enabled: false, retentionDays: 14, cron: "0 3 * * *" } }, auth: { linuxDo: { clientId: "", clientSecret: "" } }, storage: { mode: "local_indexeddb", allowUserProvider: false, allowUserGlobalProvider: true, autoSyncAllAssets: false, providers: [], roundRobinCursor: 0, capacityCheck: { enabled: false, cron: "0 */6 * * *" }, capacityLimitBytes: 9 * 1024 * 1024 * 1024 } },
 };
-const emptyChannel: AdminModelChannel = { id: "", protocol: "openai", name: "", baseUrl: modelChannelDefaultBaseUrls.openai, apiKey: "", models: [], weight: 1, timeout: 600, enabled: true, remark: "" };
+const emptyChannel: AdminModelChannel = { id: "", protocol: "omniall", name: "", baseUrl: modelChannelDefaultBaseUrls.omniall, apiKey: "", models: [], weight: 1, timeout: 600, enabled: true, remark: "" };
 const emptyS3StorageProvider: AdminStorageProvider = { id: "", name: "", type: "s3", endpoint: "", region: "auto", bucket: "", accessKeyId: "", secretAccessKey: "", publicBaseUrl: "", pathPrefix: "canvas", username: "", password: "", weight: 1, enabled: true, ownerUserId: "", capacityBytes: 0, capacityCheckedAt: "", capacityExceeded: false };
 const emptyWebDAVStorageProvider: AdminStorageProvider = { ...emptyS3StorageProvider, name: "", type: "webdav", region: "" };
 
@@ -113,7 +114,7 @@ export default function AdminSettingsPage() {
                 private: JSON.stringify(data.private, null, 2),
             });
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "读取设置失败");
+            message.error(error instanceof Error ? error.message : t("读取设置失败"));
         } finally {
             setIsLoading(false);
         }
@@ -137,7 +138,7 @@ export default function AdminSettingsPage() {
                 draft?: Partial<AdminModelChannel>;
                 editingChannelIndex?: number | null;
             };
-            if (!result.key || !result.draft) throw new Error("TokenDance 授权结果不完整");
+            if (!result.key || !result.draft) throw new Error(t("TokenDance 授权结果不完整"));
 
             const channel = normalizeChannel({ ...result.draft, apiKey: result.key });
             setActiveTab("private");
@@ -146,9 +147,9 @@ export default function AdminSettingsPage() {
             setWorkflowChannelDraft(channel);
             setIsChannelDrawerOpen(true);
             rememberModels(channel.models);
-            message.success("TokenDance 登录成功，API Key 已填入");
+            message.success(t("TokenDance 登录成功，API Key 已填入"));
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "TokenDance 授权结果读取失败");
+            message.error(error instanceof Error ? error.message : t("TokenDance 授权结果读取失败"));
         } finally {
             sessionStorage.removeItem(storageKey);
             url.searchParams.delete("tokendance_oauth");
@@ -180,9 +181,9 @@ export default function AdminSettingsPage() {
                 public: JSON.stringify(merged.public, null, 2),
                 private: JSON.stringify(merged.private, null, 2),
             });
-            message.success("已保存");
+            message.success(t("已保存"));
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "保存失败");
+            message.error(error instanceof Error ? error.message : t("保存失败"));
         } finally {
             setIsSaving(false);
         }
@@ -199,7 +200,7 @@ export default function AdminSettingsPage() {
         }
         const parsed = parseTabJson(tab, jsonText[tab]);
         if (!parsed) {
-            message.error("JSON 格式不正确");
+            message.error(t("JSON 格式不正确"));
             return;
         }
         form.setFieldsValue({ [tab]: parsed } as Partial<AdminSettings>);
@@ -212,7 +213,7 @@ export default function AdminSettingsPage() {
     const formatJson = (tab: SettingsTabKey) => {
         const parsed = parseTabJson(tab, jsonText[tab]);
         if (!parsed) {
-            message.error("JSON 格式不正确");
+            message.error(t("JSON 格式不正确"));
             return;
         }
         if (tab === "public") setModelCosts((parsed as AdminSettings["public"]).modelChannel.modelCosts);
@@ -242,14 +243,14 @@ export default function AdminSettingsPage() {
             target: "admin",
             draft: channelForm.getFieldsValue(true) as unknown as Record<string, unknown>,
             editingChannelIndex,
-        }).catch((error) => message.error(error instanceof Error ? error.message : "TokenDance 登录失败"));
+        }).catch((error) => message.error(error instanceof Error ? error.message : t("TokenDance 登录失败")));
     };
 
     const saveChannel = async () => {
         const values = await channelForm.validateFields();
         const channel = normalizeChannel(isWorkflowProtocol(values.protocol) ? { ...workflowChannelDraft, ...channelForm.getFieldsValue(true), ...values } : { ...values, modelCapabilities: channelForm.getFieldValue("modelCapabilities"), parameterTranslation: channelForm.getFieldValue("parameterTranslation") });
         if (channel.protocol === "runninghub" && (!channel.baseUrl.trim() || (!channel.apiKey.trim() && editingChannelIndex === null))) {
-            message.error("请填写 RunningHub Base URL 和积分 API Key");
+            message.error(t("请填写 RunningHub Base URL 和积分 API Key"));
             return;
         }
         rememberModels(channel.models);
@@ -264,11 +265,11 @@ export default function AdminSettingsPage() {
         if (!token) return;
         const channel = channelForm.getFieldsValue();
         if (!channel?.baseUrl) {
-            message.warning("请先填写接口地址");
+            message.warning(t("请先填写接口地址"));
             return;
         }
         if (editingChannelIndex === null && !channel?.apiKey) {
-            message.warning("请先填写 API Key");
+            message.warning(t("请先填写 API Key"));
             return;
         }
         return fetchChannelModels(token, { index: editingChannelIndex ?? undefined, channel: normalizeChannel(channel) });
@@ -295,7 +296,7 @@ export default function AdminSettingsPage() {
     const openTestDialog = (index: number) => {
         const channel = normalizeChannel(channels[index]);
         if (!channel.baseUrl || channel.models.length === 0) {
-            message.warning("请先填写接口地址和至少一个模型");
+            message.warning(t("请先填写接口地址和至少一个模型"));
             return;
         }
         setTestChannelIndex(index);
@@ -323,7 +324,7 @@ export default function AdminSettingsPage() {
             const result = await testChannelModel(token, { index: testChannelIndex, channel, model });
             setTestResults((current) => ({ ...current, [model]: { status: "success", duration: `${((performance.now() - startedAt) / 1000).toFixed(2)}s`, message: result } }));
         } catch (error) {
-            setTestResults((current) => ({ ...current, [model]: { status: "error", message: error instanceof Error ? error.message : "测试失败" } }));
+            setTestResults((current) => ({ ...current, [model]: { status: "error", message: error instanceof Error ? error.message : t("测试失败") } }));
         } finally {
             setTestingModels((current) => current.filter((item) => item !== model));
         }
@@ -339,7 +340,7 @@ export default function AdminSettingsPage() {
     const testModels = (testChannel?.models || []).filter((model) => `${model} ${modelLabel(model, testChannel)}`.toLowerCase().includes(testKeyword.trim().toLowerCase()));
 
     async function persistChannels(nextChannels: AdminModelChannel[]) {
-        if (!token) throw new Error("请先登录");
+        if (!token) throw new Error(t("请先登录"));
         const values = normalizeSettings(form.getFieldsValue(true) as AdminSettings);
         const nextChannelModels = collectChannelModels(nextChannels);
         const nextChannelWorkflows = collectChannelWorkflows(nextChannels);
@@ -360,7 +361,7 @@ export default function AdminSettingsPage() {
             public: JSON.stringify(merged.public, null, 2),
             private: JSON.stringify(merged.private, null, 2),
         });
-        message.success("已保存");
+        message.success(t("已保存"));
     }
 
     async function measureStorageProviderAt(index: number) {
@@ -372,9 +373,9 @@ export default function AdminSettingsPage() {
             const next = normalizeSettings(await fetchAdminSettings(token));
             form.setFieldsValue(next);
             setJsonText({ public: JSON.stringify(next.public, null, 2), private: JSON.stringify(next.private, null, 2) });
-            message.success(`容量统计完成：${formatStorageBytes(result.bytes)}${result.overLimit ? "，已达到上限并禁用" : ""}`);
+            message.success(`容量统计完成：${formatStorageBytes(result.bytes)}${result.overLimit ? t("，已达到上限并禁用") : ""}`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "容量统计失败");
+            message.error(error instanceof Error ? error.message : t("容量统计失败"));
         } finally {
             setMeasuringProviderIndex(null);
         }
@@ -389,16 +390,18 @@ export default function AdminSettingsPage() {
                             activeKey={activeTab}
                             onChange={(key) => changeTab(key as SettingsTabKey)}
                             items={[
-                                { key: "public", label: "公开配置（对外暴露）" },
-                                { key: "private", label: "私有配置（不会对外暴露）" },
+                                { key: "public", label: t("公开配置（对外暴露）") },
+                                { key: "private", label: t("私有配置（不会对外暴露）") },
                             ]}
                         />
                         <Space>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
-                                刷新
+                                
+                                {t("刷新")}
                             </Button>
                             <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
-                                保存设置
+                                
+                                {t("保存设置")}
                             </Button>
                         </Space>
                     </Flex>
@@ -410,8 +413,8 @@ export default function AdminSettingsPage() {
                             value={activeMode}
                             onChange={(value) => toggleMode(activeTab, value as EditorMode)}
                             options={[
-                                { label: "可视化编辑", value: "visual" },
-                                { label: "手动编辑 JSON", value: "json" },
+                                { label: t("可视化编辑"), value: "visual" },
+                                { label: t("手动编辑 JSON"), value: "json" },
                             ]}
                         />
                         {activeMode === "json" ? (
@@ -420,15 +423,17 @@ export default function AdminSettingsPage() {
                                     <Tag color="error">{jsonError}</Tag>
                                 ) : (
                                     <Tag color="success" icon={<CheckCircleOutlined />}>
-                                        JSON 格式正确
+                                        
+                                        {t("JSON 格式正确")}
                                     </Tag>
                                 )}
                                 <Button icon={<FormatPainterOutlined />} onClick={() => formatJson(activeTab)}>
-                                    格式化
+                                    
+                                    {t("格式化")}
                                 </Button>
                             </Space>
                         ) : (
-                            <Typography.Text type="secondary">{activeTab === "public" ? "这些配置会暴露给前端读取" : "这些配置只会在后台保存"}</Typography.Text>
+                            <Typography.Text type="secondary">{activeTab === "public" ? t("这些配置会暴露给前端读取") : t("这些配置只会在后台保存")}</Typography.Text>
                         )}
                     </Flex>
 
@@ -437,59 +442,59 @@ export default function AdminSettingsPage() {
                             <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
                                 <Row gutter={16}>
                                     <Col span={24}>
-                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型(请先在私有配置里配置渠道)" extra="可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定">
-                                            <Select mode="multiple" showSearch={{ optionFilterProp: ["label", "value"] }} placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
+                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label={t("系统可用模型(请先在私有配置里配置渠道)")} extra={t("可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定")}>
+                                            <Select mode="multiple" showSearch={{ optionFilterProp: ["label", "value"] }} placeholder={t("请选择系统可用模型")} options={channelModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
                                         </Form.Item>
-                                        <Form.Item name={["public", "modelChannel", "availableWorkflows"]} label="系统可用工作流" extra="先在私有渠道启用工作流，再在这里勾选对用户开放的工作流">
-                                            <Select mode="multiple" showSearch={{ optionFilterProp: ["label", "value"] }} placeholder="请选择系统可用工作流" options={channelWorkflows} />
+                                        <Form.Item name={["public", "modelChannel", "availableWorkflows"]} label={t("系统可用工作流")} extra={t("先在私有渠道启用工作流，再在这里勾选对用户开放的工作流")}>
+                                            <Select mode="multiple" showSearch={{ optionFilterProp: ["label", "value"] }} placeholder={t("请选择系统可用工作流")} options={channelWorkflows} />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
+                                        <Form.Item name={["public", "modelChannel", "defaultModel"]} label={t("默认模型")}>
                                             <Select showSearch={{ optionFilterProp: ["label", "value"] }} allowClear options={publicModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
+                                        <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label={t("默认图片模型")}>
                                             <Select showSearch={{ optionFilterProp: ["label", "value"] }} allowClear options={publicModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
+                                        <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label={t("默认视频模型")}>
                                             <Select showSearch={{ optionFilterProp: ["label", "value"] }} allowClear options={publicModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
+                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label={t("默认文本模型")}>
                                             <Select showSearch={{ optionFilterProp: ["label", "value"] }} allowClear options={publicModels.map((item) => ({ label: publicModelLabel(item), value: item }))} />
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Typography.Title level={5}>内置/系统提示词</Typography.Title>
+                                        <Typography.Title level={5}>{t("内置/系统提示词")}</Typography.Title>
                                         <Row gutter={16}>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "image"]} label="生图系统提示词">
-                                                    <Input.TextArea rows={4} placeholder="会自动追加在生图提示词前，不在输入框中展示" />
+                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "image"]} label={t("生图系统提示词")}>
+                                                    <Input.TextArea rows={4} placeholder={t("会自动追加在生图提示词前，不在输入框中展示")} />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "video"]} label="视频系统提示词">
-                                                    <Input.TextArea rows={4} placeholder="会自动追加在视频提示词前" />
+                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "video"]} label={t("视频系统提示词")}>
+                                                    <Input.TextArea rows={4} placeholder={t("会自动追加在视频提示词前")} />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "text"]} label="文本/问答系统提示词">
-                                                    <Input.TextArea rows={4} placeholder="用于画布问答、AI 文本等文本模型调用" />
+                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "text"]} label={t("文本/问答系统提示词")}>
+                                                    <Input.TextArea rows={4} placeholder={t("用于画布问答、AI 文本等文本模型调用")} />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "workflow"]} label="工作流运行系统提示词">
-                                                    <Input.TextArea rows={4} placeholder="用于工作流运行时补充统一创作要求" />
+                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "workflow"]} label={t("工作流运行系统提示词")}>
+                                                    <Input.TextArea rows={4} placeholder={t("用于工作流运行时补充统一创作要求")} />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24}>
-                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "workflowAgent"]} label="工作流创建 Agent 系统提示词">
-                                                    <Input.TextArea rows={6} placeholder="控制 AI 创建工作流的输出规范和默认参数" />
+                                                <Form.Item name={["public", "modelChannel", "systemPrompts", "workflowAgent"]} label={t("工作流创建 Agent 系统提示词")}>
+                                                    <Input.TextArea rows={6} placeholder={t("控制 AI 创建工作流的输出规范和默认参数")} />
                                                 </Form.Item>
                                             </Col>
                                         </Row>
@@ -498,22 +503,22 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Form.Item name={["public", "modelChannel", "allowCustomChannel"]} label="是否允许用户自定义渠道" extra="开启后，前端可提供用户自定义 baseUrl 直连模式" valuePropName="checked">
+                                        <Form.Item name={["public", "modelChannel", "allowCustomChannel"]} label={t("是否允许用户自定义渠道")} extra={t("开启后，前端可提供用户自定义 baseUrl 直连模式")} valuePropName="checked">
                                             <Switch />
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Form.Item name={["public", "modelChannel", "allowUserRemoteChannel"]} label="是否允许普通用户使用云端渠道" extra="关闭后，普通用户只能使用本地直连；管理员仍可使用云端渠道" valuePropName="checked">
+                                        <Form.Item name={["public", "modelChannel", "allowUserRemoteChannel"]} label={t("是否允许普通用户使用云端渠道")} extra={t("关闭后，普通用户只能使用本地直连；管理员仍可使用云端渠道")} valuePropName="checked">
                                             <Switch />
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Form.Item name={["public", "auth", "allowRegister"]} label="是否允许用户注册" extra="关闭后隐藏注册入口，注册接口也会拒绝新用户创建" valuePropName="checked">
+                                        <Form.Item name={["public", "auth", "allowRegister"]} label={t("是否允许用户注册")} extra={t("关闭后隐藏注册入口，注册接口也会拒绝新用户创建")} valuePropName="checked">
                                             <Switch />
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Typography.Title level={5}>模型／工作流算力点</Typography.Title>
+                                        <Typography.Title level={5}>{t("模型／工作流算力点")}</Typography.Title>
                                         <Table
                                             rowKey="model"
                                             pagination={false}
@@ -526,12 +531,12 @@ export default function AdminSettingsPage() {
                                                 }) : []),
                                             ]}
                                             columns={[
-                                                { title: "模型 / 工作流", dataIndex: "model", render: (_, item) => <span title={item.label}>{item.label}</span> },
+                                                { title: t("模型 / 工作流"), dataIndex: "model", render: (_, item) => <span title={item.label}>{item.label}</span> },
                                                 {
                                                     title: (
                                                         <span className="grid leading-tight">
-                                                            <span>计费单价</span>
-                                                            <span className="text-xs font-normal text-[var(--ant-color-text-secondary)]">视频模型按秒，工作流按次</span>
+                                                            <span>{t("计费单价")}</span>
+                                                            <span className="text-xs font-normal text-[var(--ant-color-text-secondary)]">{t("视频模型按秒，工作流按次")}</span>
                                                         </span>
                                                     ),
                                                     dataIndex: "credits",
@@ -540,7 +545,8 @@ export default function AdminSettingsPage() {
                                                         <Space.Compact className="!w-full">
                                                             <InputNumber min={0} step={0.01} precision={2} className="!w-full" value={item.credits} onChange={(value) => setModelCost(form, setModelCosts, item.model, Number(value) || 0)} />
                                                             <span className="flex h-8 items-center rounded-r-md border border-l-0 border-stone-200 bg-stone-50 px-3 text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
-                                                                点
+                                                                
+                                                                {t("点")}
                                                             </span>
                                                         </Space.Compact>
                                                     ),
@@ -571,108 +577,111 @@ export default function AdminSettingsPage() {
                                     title={
                                         <Space>
                                             <img src="/icons/linuxdo.svg" alt="" width={18} height={18} />
-                                            Linux.do 登录
+                                            
+                                            {t("Linux.do 登录")}
                                         </Space>
                                     }
                                 >
                                     <Flex vertical gap={14}>
                                         <Typography.Text type="secondary">
-                                            本项目接口回调地址是 /api/auth/linux-do/callback，请在 Linux.do 应用后台自行拼接站点前缀。
+                                            
+                                            {t("本项目接口回调地址是 /api/auth/linux-do/callback，请在 Linux.do 应用后台自行拼接站点前缀。")}
                                             <Typography.Link href="https://connect.linux.do" target="_blank" rel="noreferrer">
-                                                点击此处管理你的 LinuxDO OAuth App
+                                                
+                                                {t("点击此处管理你的 LinuxDO OAuth App")}
                                             </Typography.Link>
                                         </Typography.Text>
                                         <Row gutter={16}>
                                             <Col xs={24} md={6}>
-                                                <Form.Item name={["public", "auth", "linuxDo", "enabled"]} label="开启 Linux.do 登录" valuePropName="checked">
+                                                <Form.Item name={["public", "auth", "linuxDo", "enabled"]} label={t("开启 Linux.do 登录")} valuePropName="checked">
                                                     <Switch />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={9}>
                                                 <Form.Item name={["private", "auth", "linuxDo", "clientId"]} label="Linux.do Client ID">
-                                                    <Input placeholder="输入 Linux.do OAuth App 的 ID" />
+                                                    <Input placeholder={t("输入 Linux.do OAuth App 的 ID")} />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={9}>
                                                 <Form.Item name={["private", "auth", "linuxDo", "clientSecret"]} label="Linux.do Client Secret">
-                                                    <Input.Password placeholder="留空则沿用已保存的密钥" />
+                                                    <Input.Password placeholder={t("留空则沿用已保存的密钥")} />
                                                 </Form.Item>
                                             </Col>
                                         </Row>
                                     </Flex>
                                 </Card>
-                                <Card size="small" title="提示词定时同步">
+                                <Card size="small" title={t("提示词定时同步")}>
                                     <Row gutter={16} align="middle">
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "promptSync", "enabled"]} label="开启定时同步" valuePropName="checked">
+                                            <Form.Item name={["private", "promptSync", "enabled"]} label={t("开启定时同步")} valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={16}>
-                                            <Form.Item name={["private", "promptSync", "cron"]} label="Cron 表达式" extra="默认每天 0 点同步内置 GitHub 远程提示词源">
+                                            <Form.Item name={["private", "promptSync", "cron"]} label={t("Cron 表达式")} extra={t("默认每天 0 点同步内置远程提示词源")}>
                                                 <Input placeholder="0 0 * * *" />
                                             </Form.Item>
                                         </Col>
                                     </Row>
                                 </Card>
-                                <Card size="small" title="AI 调用日志">
+                                <Card size="small" title={t("AI 调用日志")}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "aiLog", "localDirectReportEnabled"]} label="本地直连日志上报" valuePropName="checked" extra="关闭后本地直连不上报；云端渠道仍默认记录。">
+                                            <Form.Item name={["private", "aiLog", "localDirectReportEnabled"]} label={t("本地直连日志上报")} valuePropName="checked" extra={t("关闭后本地直连不上报；云端渠道仍默认记录。")}>
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "aiLog", "cleanup", "enabled"]} label="开启自动清理" valuePropName="checked" extra="日志按天写入本地文件，不保存到 SQLite。">
+                                            <Form.Item name={["private", "aiLog", "cleanup", "enabled"]} label={t("开启自动清理")} valuePropName="checked" extra={t("日志按天写入本地文件，不保存到 SQLite。")}>
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "aiLog", "cleanup", "retentionDays"]} label="保留天数" extra="默认保留 14 天，超过后定时删除对应日期日志文件。">
+                                            <Form.Item name={["private", "aiLog", "cleanup", "retentionDays"]} label={t("保留天数")} extra={t("默认保留 14 天，超过后定时删除对应日期日志文件。")}>
                                                 <InputNumber min={1} precision={0} className="!w-full" />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "aiLog", "cleanup", "cron"]} label="清理 Cron">
+                                            <Form.Item name={["private", "aiLog", "cleanup", "cron"]} label={t("清理 Cron")}>
                                                 <Input placeholder="0 3 * * *" />
                                             </Form.Item>
                                         </Col>
                                     </Row>
                                 </Card>
-                                <Card size="small" title="数据存储">
+                                <Card size="small" title={t("数据存储")}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={6}>
-                                            <Form.Item label="存储模式" extra="根据对象存储配置和启用状态自动识别。">
+                                            <Form.Item label={t("存储模式")} extra={t("根据对象存储配置和启用状态自动识别。")}>
                                                 <Input disabled value="自动识别 (动态切换)" />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "storage", "allowUserProvider"]} label="允许用户配置 S3/WebDAV" valuePropName="checked">
+                                            <Form.Item name={["private", "storage", "allowUserProvider"]} label={t("允许用户配置 S3/WebDAV")} valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "storage", "allowUserGlobalProvider"]} label="允许用户使用全局配置渠道" valuePropName="checked">
+                                            <Form.Item name={["private", "storage", "allowUserGlobalProvider"]} label={t("允许用户使用全局配置渠道")} valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "storage", "autoSyncAllAssets"]} label="全部素材云端同步" extra="上传、导入及生成的图片、视频、音频自动同步到可用云存储；关闭保持原有行为" valuePropName="checked">
+                                            <Form.Item name={["private", "storage", "autoSyncAllAssets"]} label={t("全部素材云端同步")} extra={t("上传、导入及生成的图片、视频、音频自动同步到可用云存储；关闭保持原有行为")} valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "storage", "capacityCheck", "enabled"]} label="定时统计容量" valuePropName="checked">
+                                            <Form.Item name={["private", "storage", "capacityCheck", "enabled"]} label={t("定时统计容量")} valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "storage", "capacityCheck", "cron"]} label="容量统计 Cron">
+                                            <Form.Item name={["private", "storage", "capacityCheck", "cron"]} label={t("容量统计 Cron")}>
                                                 <Input placeholder="0 */6 * * *" />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "storage", "capacityLimitBytes"]} label="容量上限(字节)" extra="默认 9GB，达到上限后会自动禁用该配置。">
+                                            <Form.Item name={["private", "storage", "capacityLimitBytes"]} label={t("容量上限(字节)")} extra={t("默认 9GB，达到上限后会自动禁用该配置。")}>
                                                 <InputNumber min={1} className="!w-full" />
                                             </Form.Item>
                                         </Col>
@@ -681,17 +690,19 @@ export default function AdminSettingsPage() {
                                         {(fields, { add, remove }) => (
                                             <Flex vertical gap={12}>
                                                 <Button icon={<PlusOutlined />} onClick={() => add(newAdminStorageProvider("s3", storageProviders))}>
-                                                    新增 S3/R2 配置
+                                                    
+                                                    {t("新增 S3/R2 配置")}
                                                 </Button>
                                                 <Button icon={<PlusOutlined />} onClick={() => add(newAdminStorageProvider("webdav", storageProviders))}>
-                                                    新增 WebDAV 配置
+                                                    
+                                                    {t("新增 WebDAV 配置")}
                                                 </Button>
                                                 {fields.map((field) => {
                                                     const provider = storageProviders[field.name] || emptyS3StorageProvider;
                                                     const isWebDAV = provider.type === "webdav";
                                                     const weightField = (
                                                         <Col xs={24} md={3}>
-                                                            <Form.Item name={[field.name, "weight"]} label="权重">
+                                                            <Form.Item name={[field.name, "weight"]} label={t("权重")}>
                                                                 <InputNumber min={1} className="!w-full" />
                                                             </Form.Item>
                                                         </Col>
@@ -704,7 +715,8 @@ export default function AdminSettingsPage() {
                                                             extra={
                                                                 <Flex gap={8}>
                                                                     <Button size="small" loading={measuringProviderIndex === field.name} onClick={() => void measureStorageProviderAt(field.name)}>
-                                                                        统计容量
+                                                                        
+                                                                        {t("统计容量")}
                                                                     </Button>
                                                                     <Button danger size="small" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
                                                                 </Flex>
@@ -715,12 +727,12 @@ export default function AdminSettingsPage() {
                                                             </Form.Item>
                                                             <Row gutter={12}>
                                                                 <Col xs={24} md={6}>
-                                                                    <Form.Item name={[field.name, "name"]} label="名称">
+                                                                    <Form.Item name={[field.name, "name"]} label={t("名称")}>
                                                                         <Input placeholder={isWebDAV ? "WebDAV" : "Cloudflare R2"} />
                                                                     </Form.Item>
                                                                 </Col>
                                                                 <Col xs={24} md={isWebDAV ? 8 : 6}>
-                                                                    <Form.Item name={[field.name, "endpoint"]} label={isWebDAV ? "WebDAV 地址" : "Endpoint"}>
+                                                                    <Form.Item name={[field.name, "endpoint"]} label={isWebDAV ? t("WebDAV 地址") : "Endpoint"}>
                                                                         <Input placeholder={isWebDAV ? "https://dav.example.com/webdav" : "https://<account>.r2.cloudflarestorage.com"} />
                                                                     </Form.Item>
                                                                 </Col>
@@ -739,7 +751,7 @@ export default function AdminSettingsPage() {
                                                                     </>
                                                                 )}
                                                                 <Col xs={24} md={4}>
-                                                                    <Form.Item name={[field.name, "enabled"]} label="启用" valuePropName="checked">
+                                                                    <Form.Item name={[field.name, "enabled"]} label={t("启用")} valuePropName="checked">
                                                                         <Switch
                                                                             onChange={(checked) => {
                                                                                 if (!checked) return;
@@ -758,18 +770,18 @@ export default function AdminSettingsPage() {
                                                                 {isWebDAV ? (
                                                                     <>
                                                                         <Col xs={24} md={6}>
-                                                                            <Form.Item name={[field.name, "pathPrefix"]} label="远程目录">
-                                                                                <Input placeholder="请输入远程目录" />
+                                                                            <Form.Item name={[field.name, "pathPrefix"]} label={t("远程目录")}>
+                                                                                <Input placeholder={t("请输入远程目录")} />
                                                                             </Form.Item>
                                                                         </Col>
                                                                         <Col xs={24} md={6}>
-                                                                            <Form.Item name={[field.name, "username"]} label="用户名">
+                                                                            <Form.Item name={[field.name, "username"]} label={t("用户名")}>
                                                                                 <Input />
                                                                             </Form.Item>
                                                                         </Col>
                                                                         <Col xs={24} md={6}>
-                                                                            <Form.Item name={[field.name, "password"]} label="密码 / 应用密码">
-                                                                                <Input.Password placeholder="留空沿用已保存密码" />
+                                                                            <Form.Item name={[field.name, "password"]} label={t("密码 / 应用密码")}>
+                                                                                <Input.Password placeholder={t("留空沿用已保存密码")} />
                                                                             </Form.Item>
                                                                         </Col>
                                                                         <Col xs={0} md={6} />
@@ -783,16 +795,16 @@ export default function AdminSettingsPage() {
                                                                         </Col>
                                                                         <Col xs={24} md={6}>
                                                                             <Form.Item name={[field.name, "secretAccessKey"]} label="Secret Access Key">
-                                                                                <Input.Password placeholder="留空沿用已保存密钥" />
+                                                                                <Input.Password placeholder={t("留空沿用已保存密钥")} />
                                                                             </Form.Item>
                                                                         </Col>
                                                                         <Col xs={24} md={6}>
-                                                                            <Form.Item name={[field.name, "publicBaseUrl"]} label="公开访问域名">
-                                                                                <Input placeholder="可选，不填则走后端代理读取" />
+                                                                            <Form.Item name={[field.name, "publicBaseUrl"]} label={t("公开访问域名")}>
+                                                                                <Input placeholder={t("可选，不填则走后端代理读取")} />
                                                                             </Form.Item>
                                                                         </Col>
                                                                         <Col xs={24} md={3}>
-                                                                            <Form.Item name={[field.name, "pathPrefix"]} label="路径前缀">
+                                                                            <Form.Item name={[field.name, "pathPrefix"]} label={t("路径前缀")}>
                                                                                 <Input placeholder="canvas" />
                                                                             </Form.Item>
                                                                         </Col>
@@ -800,17 +812,17 @@ export default function AdminSettingsPage() {
                                                                     </>
                                                                 )}
                                                                 <Col xs={24} md={4}>
-                                                                    <Form.Item label="已用容量">
+                                                                    <Form.Item label={t("已用容量")}>
                                                                         <Typography.Text>{formatStorageBytes(form.getFieldValue(["private", "storage", "providers", field.name, "capacityBytes"]) || 0)}</Typography.Text>
                                                                     </Form.Item>
                                                                 </Col>
                                                                 <Col xs={24} md={5}>
-                                                                    <Form.Item name={[field.name, "capacityCheckedAt"]} label="统计时间">
+                                                                    <Form.Item name={[field.name, "capacityCheckedAt"]} label={t("统计时间")}>
                                                                         <Input disabled />
                                                                     </Form.Item>
                                                                 </Col>
                                                                 <Col xs={24} md={3}>
-                                                                    <Form.Item name={[field.name, "capacityExceeded"]} label="超限" valuePropName="checked">
+                                                                    <Form.Item name={[field.name, "capacityExceeded"]} label={t("超限")} valuePropName="checked">
                                                                         <Switch disabled />
                                                                     </Form.Item>
                                                                 </Col>
@@ -823,36 +835,38 @@ export default function AdminSettingsPage() {
                                     </Form.List>
                                 </Card>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
-                                    新增渠道
+                                    
+                                    {t("新增渠道")}
                                 </Button>
                                 <Table
                                     rowKey="_rowKey"
                                     pagination={false}
                                     dataSource={channelTableData}
                                     columns={[
-                                        { title: "名称", dataIndex: "name", render: (value) => value || "未命名渠道" },
-                                        { title: "协议", dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
-                                        { title: "状态", dataIndex: "enabled", width: 120, render: (value, item) => isWorkflowProtocol(item.protocol) ? <Tag>{`启用 ${(item.workflows || []).filter((entry) => entry.enabled).length} / ${(item.workflows || []).length} 条`}</Tag> : <Tag color={value ? "success" : "default"}>{value ? "已启用" : "已停用"}</Tag> },
+                                        { title: t("名称"), dataIndex: "name", render: (value) => value || t("未命名渠道") },
+                                        { title: t("协议"), dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
+                                        { title: t("状态"), dataIndex: "enabled", width: 120, render: (value, item) => isWorkflowProtocol(item.protocol) ? <Tag>{`启用 ${(item.workflows || []).filter((entry) => entry.enabled).length} / ${(item.workflows || []).length} 条`}</Tag> : <Tag color={value ? "success" : "default"}>{value ? t("已启用") : t("已停用")}</Tag> },
                                         {
-                                            title: "模型",
+                                            title: t("模型"),
                                             dataIndex: "models",
                                             render: (value: string[], item) => (
                                                 <Typography.Text ellipsis style={{ maxWidth: 360 }}>
-                                                    {isWorkflowProtocol(item.protocol) ? (item.workflows || []).map((entry) => entry.title || entry.workflowId).join("、") || "未配置工作流" : modelSummary(value || [])}
+                                                    {isWorkflowProtocol(item.protocol) ? (item.workflows || []).map((entry) => entry.title || entry.workflowId).join("、") || t("未配置工作流") : modelSummary(value || [])}
                                                 </Typography.Text>
                                             ),
                                         },
-                                        { title: "权重", dataIndex: "weight", width: 88 },
-                                        { title: "超时", dataIndex: "timeout", width: 96, render: (value) => `${value || 600}s` },
+                                        { title: t("权重"), dataIndex: "weight", width: 88 },
+                                        { title: t("超时"), dataIndex: "timeout", width: 96, render: (value) => `${value || 600}s` },
                                         {
-                                            title: "操作",
+                                            title: t("操作"),
                                             key: "actions",
                                             width: 220,
                                             render: (_, item) => (
                                                 <Space size={4}>
-                                                    {!isWorkflowProtocol(item.protocol) ? <Button size="small" onClick={() => openTestDialog(item._index)}>测试</Button> : null}
+                                                    {!isWorkflowProtocol(item.protocol) ? <Button size="small" onClick={() => openTestDialog(item._index)}>{t("测试")}</Button> : null}
                                                     <Button size="small" onClick={() => openChannelDrawer(item._index)}>
-                                                        编辑
+                                                        
+                                                        {t("编辑")}
                                                     </Button>
                                                     <Button
                                                         danger
@@ -886,15 +900,16 @@ export default function AdminSettingsPage() {
                     )}
                 </Card>
                 <Drawer
-                    title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
+                    title={editingChannelIndex === null ? t("新增渠道") : t("编辑渠道")}
                     open={isChannelDrawerOpen}
                     size={isWorkflowProtocol(channelProtocol) ? "75vw" : 560}
                     onClose={closeChannelDrawer}
                     extra={
                         <Space>
-                            <Button onClick={closeChannelDrawer}>取消</Button>
+                            <Button onClick={closeChannelDrawer}>{t("取消")}</Button>
                             <Button type="primary" disabled={isLoading} onClick={() => void saveChannel()}>
-                                保存
+                                
+                                {t("保存")}
                             </Button>
                         </Space>
                     }
@@ -903,12 +918,12 @@ export default function AdminSettingsPage() {
                     <Form form={channelForm} layout="vertical" requiredMark={false} initialValues={emptyChannel}>
                         <Row gutter={16}>
                             <Col span={12}>
-                                <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请输入渠道名称" }]}>
+                                <Form.Item name="name" label={t("渠道名称")} rules={[{ required: true, message: t("请输入渠道名称") }]}>
                                     <Input />
                                 </Form.Item>
                             </Col>
                             <Col span={12}>
-                                <Form.Item name="protocol" label="协议">
+                                <Form.Item name="protocol" label={t("协议")}>
                                     <Select
                                         options={modelChannelProtocolOptions}
                                         onChange={(protocol: AdminModelChannel["protocol"]) => {
@@ -920,17 +935,17 @@ export default function AdminSettingsPage() {
                             </Col>
                             {!isWorkflowProtocol(channelProtocol) ? <>
                             <Col span={12}>
-                                <Form.Item name="weight" label="权重">
+                                <Form.Item name="weight" label={t("权重")}>
                                     <InputNumber min={1} step={1} className="!w-full" />
                                 </Form.Item>
                             </Col>
                             <Col span={12}>
-                                <Form.Item name="timeout" label="请求超时（秒）" extra="用于后台代理请求、模型列表读取和渠道测试">
+                                <Form.Item name="timeout" label={t("请求超时（秒）")} extra={t("用于后台代理请求、模型列表读取和渠道测试")}>
                                     <InputNumber min={1} step={30} className="!w-full" />
                                 </Form.Item>
                             </Col>
                             <Col span={12}>
-                                <Form.Item name="enabled" label="启用" valuePropName="checked">
+                                <Form.Item name="enabled" label={t("启用")} valuePropName="checked">
                                     <Switch />
                                 </Form.Item>
                             </Col>
@@ -939,7 +954,8 @@ export default function AdminSettingsPage() {
                                     name="baseUrl"
                                     label={
                                         <span className="relative inline-flex items-center">
-                                            接口地址
+                                            
+                                            {t("接口地址")}
                                             {channelProtocol === "tokendance" || channelApiKeyUrl ? (
                                                 <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap">
                                                     <Button
@@ -949,29 +965,29 @@ export default function AdminSettingsPage() {
                                                         target={channelProtocol === "tokendance" ? undefined : "_blank"}
                                                         onClick={channelProtocol === "tokendance" ? () => void loginTokenDance() : undefined}
                                                     >
-                                                        {channelProtocol === "tokendance" ? "登录" : "获取 API Key"}
+                                                        {channelProtocol === "tokendance" ? t("登录") : t("获取 API Key")}
                                                     </Button>
                                                 </span>
                                             ) : null}
                                         </span>
                                     }
-                                    rules={[{ required: true, message: "请输入接口地址" }]}
+                                    rules={[{ required: true, message: t("请输入接口地址") }]}
                                 >
                                     <Input />
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
-                                <Form.Item name="apiKey" label="API Key" rules={editingChannelIndex === null ? [{ required: true, message: "请输入 API Key" }] : []}>
-                                    <Input.Password placeholder={editingChannelIndex === null ? "" : "留空则沿用已保存的 API Key"} />
+                                <Form.Item name="apiKey" label="API Key" rules={editingChannelIndex === null ? [{ required: true, message: t("请输入 API Key") }] : []}>
+                                    <Input.Password placeholder={editingChannelIndex === null ? "" : t("留空则沿用已保存的 API Key")} />
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
-                                <Form.Item label="渠道可用模型">
+                                <Form.Item label={t("渠道可用模型")}>
                                     <Space.Compact style={{ width: "100%" }}>
                                         <Form.Item name="models" noStyle>
                                             <Select mode="tags" showSearch={{ optionFilterProp: ["label", "value"] }} maxTagCount="responsive" tokenSeparators={[",", "\n"]} options={knownModels.map((model) => ({ label: modelLabel(model, { protocol: channelProtocol, baseUrl: channelBaseUrl }), value: model }))} />
                                         </Form.Item>
-                                        <Button onClick={() => openChannelModelSelector()}>选择模型</Button>
+                                        <Button onClick={() => openChannelModelSelector()}>{t("选择模型")}</Button>
                                     </Space.Compact>
                                 </Form.Item>
                             </Col>
@@ -993,15 +1009,15 @@ export default function AdminSettingsPage() {
                                     onWorkflowsChange={(workflows) => { channelForm.setFieldValue("workflows", workflows); setWorkflowChannelDraft((current) => ({ ...current, workflows })); }}
                                     onBeforeTest={async () => {
                                         const saved = editingChannelIndex === null ? undefined : channels[editingChannelIndex];
-                                        if (!saved?.id) throw new Error("请先保存渠道后再测试");
+                                        if (!saved?.id) throw new Error(t("请先保存渠道后再测试"));
                                         const draft = normalizeChannel({ ...workflowChannelDraft, ...channelForm.getFieldsValue(true) });
-                                        if (JSON.stringify(draft) !== JSON.stringify(normalizeChannel(saved))) throw new Error("当前配置有未保存修改，请先保存后再测试");
+                                        if (JSON.stringify(draft) !== JSON.stringify(normalizeChannel(saved))) throw new Error(t("当前配置有未保存修改，请先保存后再测试"));
                                         return saved.id;
                                     }}
                                 />
                             </Col>}
                             <Col span={24}>
-                                <Form.Item name="remark" label="备注">
+                                <Form.Item name="remark" label={t("备注")}>
                                     <Input.TextArea rows={3} />
                                 </Form.Item>
                             </Col>
@@ -1022,7 +1038,7 @@ export default function AdminSettingsPage() {
                 <Modal
                     title={
                         <Space>
-                            {testChannel?.name || "渠道"} 渠道的模型测试<Typography.Text type="secondary">共 {testChannel?.models.length || 0} 个模型</Typography.Text>
+                            {testChannel?.name || t("渠道")}  {t("渠道的模型测试")}<Typography.Text type="secondary">{t("共")} {testChannel?.models.length || 0}  {t("个模型")}</Typography.Text>
                         </Space>
                     }
                     open={testChannelIndex !== null}
@@ -1030,17 +1046,18 @@ export default function AdminSettingsPage() {
                     onCancel={closeTestDialog}
                     footer={
                         <Space>
-                            <Button onClick={closeTestDialog}>取消</Button>
+                            <Button onClick={closeTestDialog}>{t("取消")}</Button>
                             <Button type="primary" disabled={!selectedTestModels.length || testingModels.length > 0} onClick={() => void batchTestModels()}>
-                                批量测试 {selectedTestModels.length} 个模型
+                                
+                                {t("批量测试")} {selectedTestModels.length}  {t("个模型")}
                             </Button>
                         </Space>
                     }
                     destroyOnHidden
                 >
                     <Flex vertical gap={12}>
-                        <Typography.Text type="secondary">测试会向选中模型发送最小测试请求，用于确认渠道是否有响应。</Typography.Text>
-                        <Input.Search placeholder="搜索模型..." allowClear value={testKeyword} onChange={(event) => setTestKeyword(event.target.value)} />
+                        <Typography.Text type="secondary">{t("测试会向选中模型发送最小测试请求，用于确认渠道是否有响应。")}</Typography.Text>
+                        <Input.Search placeholder={t("搜索模型...")} allowClear value={testKeyword} onChange={(event) => setTestKeyword(event.target.value)} />
                         <Table
                             rowKey="model"
                             pagination={false}
@@ -1051,19 +1068,19 @@ export default function AdminSettingsPage() {
                                 onChange: (keys) => setSelectedTestModels(keys.map(String)),
                             }}
                             columns={[
-                                { title: "模型名称", dataIndex: "model", render: (value) => <Typography.Text strong title={value}>{modelLabel(value, testChannel)}</Typography.Text> },
+                                { title: t("模型名称"), dataIndex: "model", render: (value) => <Typography.Text strong title={value}>{modelLabel(value, testChannel)}</Typography.Text> },
                                 {
-                                    title: "状态",
+                                    title: t("状态"),
                                     dataIndex: "model",
                                     width: 260,
                                     render: (value) => {
-                                        if (testingModels.includes(value)) return <Tag icon={<LoadingOutlined className="animate-spin" />}>测试中</Tag>;
+                                        if (testingModels.includes(value)) return <Tag icon={<LoadingOutlined className="animate-spin" />}>{t("测试中")}</Tag>;
                                         const result = testResults[value];
-                                        if (!result) return <Tag>未开始</Tag>;
+                                        if (!result) return <Tag>{t("未开始")}</Tag>;
                                         return result.status === "success" ? (
                                             <Space size={6} wrap>
-                                                <Tag color="success">成功</Tag>
-                                                <Typography.Text type="secondary">请求时长: {result.duration}</Typography.Text>
+                                                <Tag color="success">{t("成功")}</Tag>
+                                                <Typography.Text type="secondary">{t("请求时长:")} {result.duration}</Typography.Text>
                                                 {result.message && result.message !== "ok" ? <Typography.Text type="secondary">{result.message}</Typography.Text> : null}
                                             </Space>
                                         ) : (
@@ -1072,12 +1089,13 @@ export default function AdminSettingsPage() {
                                     },
                                 },
                                 {
-                                    title: "操作",
+                                    title: t("操作"),
                                     key: "actions",
                                     width: 120,
                                     render: (_, item) => (
                                         <Button size="small" loading={testingModels.includes(item.model)} onClick={() => void testModelOnline(item.model)}>
-                                            测试
+                                            
+                                            {t("测试")}
                                         </Button>
                                     ),
                                 },
@@ -1264,7 +1282,7 @@ function filterModels(models: string[], options: string[]) {
 }
 
 function modelSummary(models: string[]) {
-    if (!models.length) return "未配置模型";
+    if (!models.length) return t("未配置模型");
     const preview = models.slice(0, 3).join(", ");
     return models.length > 3 ? `${models.length} 个模型：${preview}...` : preview;
 }
@@ -1297,7 +1315,7 @@ async function collectSettings(form: any, editorMode: Record<SettingsTabKey, Edi
     if (editorMode.public === "json") {
         const publicSetting = parseTabJson("public", jsonText.public);
         if (!publicSetting) {
-            message.error("公开配置 JSON 格式不正确");
+            message.error(t("公开配置 JSON 格式不正确"));
             return null;
         }
         values.public = publicSetting;
@@ -1305,7 +1323,7 @@ async function collectSettings(form: any, editorMode: Record<SettingsTabKey, Edi
     if (editorMode.private === "json") {
         const privateSetting = parseTabJson("private", jsonText.private);
         if (!privateSetting) {
-            message.error("私有配置 JSON 格式不正确");
+            message.error(t("私有配置 JSON 格式不正确"));
             return null;
         }
         values.private = privateSetting;
@@ -1321,6 +1339,6 @@ function getJsonError(value: string) {
         JSON.parse(value);
         return "";
     } catch (error) {
-        return error instanceof Error ? error.message : "JSON 格式不正确";
+        return error instanceof Error ? error.message : t("JSON 格式不正确");
     }
 }

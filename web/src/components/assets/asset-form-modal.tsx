@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { ChevronDown, Upload } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { App, AutoComplete, Button, Form, Input, Modal, Select, Space, Tag, Typography } from "antd";
@@ -78,7 +79,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
         } else if (values.kind === "image") {
             const url = (values.content || "").trim();
             if (!imageDraft && !url) {
-                message.error("请选择图片文件或填写图片 URL");
+                message.error(t("请选择图片文件或填写图片 URL"));
                 return;
             }
             let data = imageDraft || { dataUrl: url, width: 0, height: 0, bytes: 0, mimeType: "image/*" };
@@ -95,7 +96,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
         } else if (values.kind === "video") {
             const url = (values.content || "").trim();
             if (!mediaDraft && !url) {
-                message.error("请选择视频文件或填写视频 URL");
+                message.error(t("请选择视频文件或填写视频 URL"));
                 return;
             }
             const data = (mediaDraft as VideoAsset["data"] | null) || { url, width: 0, height: 0, bytes: 0, mimeType: "video/mp4" };
@@ -104,7 +105,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
         } else {
             const url = (values.content || "").trim();
             if (!mediaDraft && !url) {
-                message.error("请选择音频文件或填写音频 URL");
+                message.error(t("请选择音频文件或填写音频 URL"));
                 return;
             }
             const data = (mediaDraft as AudioAsset["data"] | null) || { url, mimeType: "audio/mpeg" };
@@ -112,7 +113,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
             asset ? updateAsset(asset.id, nextAsset) : addAsset(nextAsset);
         }
 
-        message.success(asset ? "素材已更新" : "素材已保存");
+        message.success(asset ? t("素材已更新") : t("素材已保存"));
         onClose();
     };
 
@@ -144,16 +145,16 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
     };
 
     return (
-            <Modal title={asset ? "编辑素材" : "新增素材"} open={open} width={980} onCancel={onClose} onOk={() => void saveAsset()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={asset ? t("编辑素材") : t("新增素材")} open={open} width={980} onCancel={onClose} onOk={() => void saveAsset()} okText={t("保存")} cancelText={t("取消")} destroyOnHidden>
                 <div className="grid gap-6 pt-1 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <Form form={form} layout="vertical" requiredMark={false} initialValues={{ kind: "text", tags: [] }}>
-                        <Form.Item name="kind" label="类型">
+                        <Form.Item name="kind" label={t("类型")}>
                             <Select
                                 options={[
-                                    { label: "文本", value: "text" },
-                                    { label: "图片", value: "image" },
-                                    { label: "视频", value: "video" },
-                                    { label: "音频", value: "audio" },
+                                    { label: t("文本"), value: "text" },
+                                    { label: t("图片"), value: "image" },
+                                    { label: t("视频"), value: "video" },
+                                    { label: t("音频"), value: "audio" },
                                 ]}
                                 onChange={(value) => {
                                     setFormKind(value);
@@ -163,39 +164,41 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
                                 }}
                             />
                         </Form.Item>
-                        <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
-                            <Input size="large" placeholder="给素材起一个容易检索的名字" />
+                        <Form.Item name="title" label={t("标题")} rules={[{ required: true, message: t("请输入标题") }]}>
+                            <Input size="large" placeholder={t("给素材起一个容易检索的名字")} />
                         </Form.Item>
-                        <Form.Item name="coverUrl" label="封面 URL">
+                        <Form.Item name="coverUrl" label={t("封面 URL")}>
                             <Space.Compact className="w-full">
-                                <Input placeholder="可粘贴图片 URL，也可以上传本地封面" />
+                                <Input placeholder={t("可粘贴图片 URL，也可以上传本地封面")} />
                                 <Button icon={<Upload className="size-3.5" />} onClick={() => coverInputRef.current?.click()}>
-                                    上传
+                                    
+                                    {t("上传")}
                                 </Button>
                             </Space.Compact>
                         </Form.Item>
-                        <Form.Item name="tags" label="标签">
-                            <Select mode="tags" tokenSeparators={[",", "，"]} placeholder="输入标签后回车" />
+                        <Form.Item name="tags" label={t("标签")}>
+                            <Select mode="tags" tokenSeparators={[",", "，"]} placeholder={t("输入标签后回车")} />
                         </Form.Item>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Form.Item name="category" label="分类">
-                                <AutoComplete allowClear suffixIcon={<ChevronDown className="size-3.5" />} options={Array.from(new Set(assets.flatMap((item) => item.category ? [item.category] : []))).map((value) => ({ value }))} placeholder="选择或输入分类" />
+                            <Form.Item name="category" label={t("分类")}>
+                                <AutoComplete allowClear suffixIcon={<ChevronDown className="size-3.5" />} options={Array.from(new Set(assets.flatMap((item) => item.category ? [item.category] : []))).map((value) => ({ value }))} placeholder={t("选择或输入分类")} />
                             </Form.Item>
-                            <Form.Item name="source" label="来源">
-                                <Input placeholder="手动添加 / 画布 / 素材库" />
+                            <Form.Item name="source" label={t("来源")}>
+                                <Input placeholder={t("手动添加 / 画布 / 素材库")} />
                             </Form.Item>
                         </div>
                         {formKind === "text" ? (
-                            <Form.Item name="content" label="文本内容" rules={[{ required: true, message: "请输入文本内容" }]}>
-                                <Input.TextArea rows={8} placeholder="保存提示词、说明文案、参考描述等文本素材" />
+                            <Form.Item name="content" label={t("文本内容")} rules={[{ required: true, message: t("请输入文本内容") }]}>
+                                <Input.TextArea rows={8} placeholder={t("保存提示词、说明文案、参考描述等文本素材")} />
                             </Form.Item>
                         ) : (
-                            <Form.Item name="content" label={formKind === "image" ? "图片内容" : formKind === "video" ? "视频内容" : "音频内容"} required>
+                            <Form.Item name="content" label={formKind === "image" ? t("图片内容") : formKind === "video" ? t("视频内容") : t("音频内容")} required>
                                 <div className="rounded-lg border border-dashed border-stone-300 p-4 dark:border-stone-700">
                                     <Space.Compact className="w-full">
-                                        <Input placeholder={formKind === "image" ? "填写图片 URL，或选择本地图片文件" : formKind === "video" ? "填写视频 URL，或选择本地视频文件" : "填写音频 URL，或选择本地音频文件"} />
+                                        <Input placeholder={formKind === "image" ? t("填写图片 URL，或选择本地图片文件") : formKind === "video" ? t("填写视频 URL，或选择本地视频文件") : t("填写音频 URL，或选择本地音频文件")} />
                                         <Button icon={<Upload className="size-4" />} onClick={() => (formKind === "image" ? imageInputRef.current?.click() : mediaInputRef.current?.click())}>
-                                            上传
+                                            
+                                            {t("上传")}
                                         </Button>
                                     </Space.Compact>
                                     <div className="mt-2">
@@ -209,7 +212,8 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
                                             </Typography.Text>
                                         ) : (
                                             <Typography.Text type="secondary" className="text-xs">
-                                                未选择文件
+                                                
+                                                {t("未选择文件")}
                                             </Typography.Text>
                                         )}
                                     </div>
@@ -218,7 +222,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
                         )}
                     </Form>
                     <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950">
-                        <Typography.Text strong>预览</Typography.Text>
+                        <Typography.Text strong>{t("预览")}</Typography.Text>
                         <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
                             {coverUrl || imageDraft?.dataUrl ? (
                                 <img src={coverUrl || imageDraft?.dataUrl} alt="" className="aspect-[4/3] w-full object-cover" />
@@ -227,11 +231,11 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
                             ) : formKind === "audio" && (mediaDraft?.url || content) ? (
                                 <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 dark:bg-stone-900"><audio src={mediaDraft?.url || content} controls className="w-full" /></div>
                             ) : (
-                                <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm text-stone-500 dark:bg-stone-900">{content || "暂无封面"}</div>
+                                <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm text-stone-500 dark:bg-stone-900">{content || t("暂无封面")}</div>
                             )}
                             <div className="p-4">
                                 <Typography.Text strong ellipsis className="block">
-                                    {title || "未命名素材"}
+                                    {title || t("未命名素材")}
                                 </Typography.Text>
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                     {tags.length ? (
@@ -241,7 +245,7 @@ export function AssetFormModal({ open, asset = null, onClose }: AssetFormModalPr
                                             </Tag>
                                         ))
                                     ) : (
-                                        <Tag className="m-0">未打标签</Tag>
+                                        <Tag className="m-0">{t("未打标签")}</Tag>
                                     )}
                                 </div>
                             </div>

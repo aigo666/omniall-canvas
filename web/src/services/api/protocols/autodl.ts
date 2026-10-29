@@ -1,6 +1,7 @@
 import { asRecord, firstString, normalizeDirectStatus, readDirectError, readPath, readString } from "./shared";
 import type { DirectProtocolAdapter } from "./types";
 
+import { t } from "@/i18n";
 export const autodlDirectProtocol: DirectProtocolAdapter = {
     rawAuthorization: true,
     pollPath: (taskId) => `/api/v1/comfyui/comfyui_workflow/result/${encodeURIComponent(taskId)}`,
@@ -44,6 +45,6 @@ function readAutoDLResult(payload: unknown, kind: "video" | "audio") {
     const output = Array.isArray(results) ? results.map(asRecord).find((item) => item.type === kind && (!item.output_type || item.output_type === "output") && /^https?:\/\//i.test(readString(item.url))) : undefined;
     const url = readString(output?.url);
     const done = normalizeDirectStatus(readString(readPath(payload, "data.status"))) === "completed";
-    const error = readAutoDLError(payload) || (done && !url ? `AutoDL 任务已完成但没有返回${kind === "audio" ? "音频" : "视频"}地址` : "");
+    const error = readAutoDLError(payload) || (done && !url ? `AutoDL 任务已完成但没有返回${kind === "audio" ? t("音频") : t("视频")}地址` : "");
     return { url, done, error };
 }

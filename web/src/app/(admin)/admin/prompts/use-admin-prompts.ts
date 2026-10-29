@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
@@ -40,10 +41,10 @@ export function useAdminPrompts() {
         onSuccess: async (categories) => {
             queryClient.setQueryData<AdminPromptCategory[]>(["admin", "prompt-categories", token], categories);
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
-            message.success("远程提示词源已同步");
+            message.success(t("远程提示词源已同步"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "同步失败");
+            message.error(error instanceof Error ? error.message : t("同步失败"));
         },
     });
 
@@ -52,10 +53,10 @@ export function useAdminPrompts() {
         onSuccess: async (categories) => {
             queryClient.setQueryData<AdminPromptCategory[]>(["admin", "prompt-categories", token], categories);
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
-            message.success("全部远程提示词源已同步");
+            message.success(t("全部远程提示词源已同步"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "同步失败");
+            message.error(error instanceof Error ? error.message : t("同步失败"));
         },
     });
 
@@ -64,10 +65,10 @@ export function useAdminPrompts() {
         onSuccess: async (_, prompt) => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
-            message.success(prompt.id ? "提示词已保存" : "提示词已新增");
+            message.success(prompt.id ? t("提示词已保存") : t("提示词已新增"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "保存失败");
+            message.error(error instanceof Error ? error.message : t("保存失败"));
         },
     });
 
@@ -76,10 +77,10 @@ export function useAdminPrompts() {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
-            message.success("提示词已删除");
+            message.success(t("提示词已删除"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "删除失败");
+            message.error(error instanceof Error ? error.message : t("删除失败"));
         },
     });
 
@@ -88,17 +89,17 @@ export function useAdminPrompts() {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
             await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
-            message.success("提示词已批量删除");
+            message.success(t("提示词已批量删除"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "批量删除失败");
+            message.error(error instanceof Error ? error.message : t("批量删除失败"));
         },
     });
 
     useEffect(() => {
         const error = categoriesQuery.error || promptsQuery.error;
         if (!error) return;
-        const errorMessage = error instanceof Error ? error.message : "读取提示词失败";
+        const errorMessage = error instanceof Error ? error.message : t("读取提示词失败");
         message.error(errorMessage);
         if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
     }, [categoriesQuery.error, clearSession, message, promptsQuery.error]);

@@ -1,18 +1,21 @@
 "use client";
 
+import { t } from "@/i18n";
 import {
     AlertCircle,
+    ArrowUp,
     BookOpen,
     Brush,
     CheckSquare,
     ChevronDown,
     ChevronUp,
-    ClipboardPaste,
     CloudUpload,
     Copy,
     Download,
+    FolderOpen,
     FolderPlus,
     History,
+    ImageIcon,
     ImagePlus,
     LoaderCircle,
     PanelBottom,
@@ -21,13 +24,13 @@ import {
     Plus,
     RotateCcw,
     Sparkles,
-    SlidersHorizontal,
     Trash2,
     Upload,
-    WandSparkles,
 } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
+import { useEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { App, Button, Checkbox, Dropdown, Empty, Image, Input, Modal, Segmented, Tag, Typography } from "antd";
+import { CanvasImageSettingsPopover } from "@/app/(user)/canvas/components/canvas-image-settings-popover";
+import { CanvasPromptPopover } from "@/app/(user)/canvas/components/canvas-prompt-popover";
 import localforage from "localforage";
 import { saveAs } from "file-saver";
 
@@ -39,11 +42,11 @@ import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/app
 import { canvasThemes } from "@/lib/canvas-theme";
 import { IMAGE_MASK_EDIT_PROMPT_PREFIX } from "@/lib/image-reference-prompt";
 import {
-    CreativeWorkflowWorkspace,
     type WorkflowExternalTaskFailure,
     type WorkflowExternalTaskStart,
     type WorkflowExternalTaskSuccess,
 } from "@/components/workflows/creative-workflow-workspace";
+import { WORKFLOW_LOG_SAVED_EVENT, WORKFLOW_TASK_FAILURE_EVENT, WORKFLOW_TASK_STARTED_EVENT, WORKFLOW_TASK_SUCCESS_EVENT } from "@/components/workflows/workflow-agent-host";
 import { normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
@@ -134,7 +137,6 @@ const CATEGORY_STORE_KEY = "infinite-canvas:image_generation_categories";
 const WORKBENCH_LAYOUT_KEY = "infinite-canvas:image-workbench-layout";
 const RESULT_VIEW_MODE_KEY = "infinite-canvas:image-result-view-mode";
 const IMAGE_TASK_POLL_INTERVAL_MS = 10000;
-const WORKFLOW_BUTTON_POSITION_KEY = "infinite-canvas:workflow-button-position";
 const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 const categoryStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_categories" });
 export default function ImagePage() {
@@ -158,18 +160,14 @@ export default function ImagePage() {
     const [categories, setCategories] = useState<GenerationCategory[]>([]);
     const [resultViewMode, setResultViewModeState] = useState<ResultViewMode>("all");
     const [activeResultCategoryId, setActiveResultCategoryId] = useState<string | null>(null);
-    const [workbenchLayout, setWorkbenchLayoutState] = useState<WorkbenchLayout>("side");
+    const [workbenchLayout, setWorkbenchLayoutState] = useState<WorkbenchLayout>("bottom");
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [maskEditTarget, setMaskEditTarget] = useState<{ image: GeneratedImage; model: string; channelId: string; quality: string; size: string; open: boolean } | null>(null);
-    const [workflowDrawerOpen, setWorkflowDrawerOpen] = useState(false);
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [now, setNow] = useState(Date.now());
-    const [workflowButtonPosition, setWorkflowButtonPosition] = useState({ x: 0, y: 0 });
-    const workflowButtonRef = useRef<HTMLButtonElement>(null);
-    const workflowButtonDragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
     const accountHistorySyncEnabledRef = useRef(false);
     const saveLogChainRef = useRef<Promise<void>>(Promise.resolve());
     const pollingLogIdsRef = useRef(new Set<string>());
@@ -204,20 +202,9 @@ export default function ImagePage() {
             if (storedLayout === "side" || storedLayout === "bottom") setWorkbenchLayoutState(storedLayout);
             const storedViewMode = window.localStorage?.getItem(RESULT_VIEW_MODE_KEY);
             if (storedViewMode === "all" || storedViewMode === "category") setResultViewModeState(storedViewMode);
-            const storedButtonPosition = JSON.parse(window.localStorage?.getItem(WORKFLOW_BUTTON_POSITION_KEY) || "null") as { x?: number; y?: number } | null;
-            if (typeof storedButtonPosition?.x === "number" && typeof storedButtonPosition?.y === "number") setWorkflowButtonPosition(clampWorkflowButtonPosition(storedButtonPosition));
-            else setWorkflowButtonPosition(defaultWorkflowButtonPosition());
         } catch {
             // Local storage can be unavailable in restricted browser contexts.
-            setWorkflowButtonPosition(defaultWorkflowButtonPosition());
         }
-
-        // 监听窗口大小变化，拉窄窗口时自动将工作流按钮实时 clamp 限制在可视区域内，杜绝越界
-        const handleResize = () => {
-            setWorkflowButtonPosition((current) => clampWorkflowButtonPosition(current));
-        };
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
     }, []);
 
     useEffect(() => {
@@ -283,52 +270,11 @@ export default function ImagePage() {
         }
     };
 
-    const persistWorkflowButtonPosition = (position: { x: number; y: number }) => {
-        const nextPosition = clampWorkflowButtonPosition(position);
-        setWorkflowButtonPosition(nextPosition);
-        try {
-            window.localStorage?.setItem(WORKFLOW_BUTTON_POSITION_KEY, JSON.stringify(nextPosition));
-        } catch {
-            // Keep the drag position in memory when localStorage is unavailable.
-        }
-    };
-
-    const handleWorkflowButtonPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-        event.currentTarget.setPointerCapture(event.pointerId);
-        const origin = workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition();
-        workflowButtonDragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: origin.x, originY: origin.y, moved: false };
-    };
-
-    const handleWorkflowButtonPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-        const drag = workflowButtonDragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        const dx = event.clientX - drag.startX;
-        const dy = event.clientY - drag.startY;
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-        
-        // 直接更新 DOM 样式，免去顶层 React State 的庞大整页重绘 Layout 卡顿！
-        const nextPos = clampWorkflowButtonPosition({ x: drag.originX + dx, y: drag.originY + dy });
-        if (workflowButtonRef.current) {
-            workflowButtonRef.current.style.left = `${nextPos.x}px`;
-            workflowButtonRef.current.style.top = `${nextPos.y}px`;
-        }
-    };
-
-    const handleWorkflowButtonPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
-        const drag = workflowButtonDragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        event.currentTarget.releasePointerCapture(event.pointerId);
-        const dx = event.clientX - drag.startX;
-        const dy = event.clientY - drag.startY;
-        const finalPos = clampWorkflowButtonPosition({ x: drag.originX + dx, y: drag.originY + dy });
-        persistWorkflowButtonPosition(finalPos);
-    };
-
-    const addReferences = async (files?: FileList | null) => {
+    const addReferences = async (files?: FileList | File[] | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
         if (!imageFiles.length) return;
         setUploadingCount(imageFiles.length);
-        const hideLoading = message.loading("正在上传参考图...", 0);
+        const hideLoading = message.loading(t("正在上传参考图..."), 0);
         try {
             const nextReferences = await Promise.all(
                 imageFiles.map(async (file) => {
@@ -337,9 +283,9 @@ export default function ImagePage() {
                 }),
             );
             setReferences((value) => [...value, ...nextReferences]);
-            message.success("参考图上传成功");
+            message.success(t("参考图上传成功"));
         } catch (error) {
-            message.error(error instanceof Error ? `上传参考图失败：${error.message}` : "上传参考图失败");
+            message.error(error instanceof Error ? `上传参考图失败：${error.message}` : t("上传参考图失败"));
         } finally {
             hideLoading();
             setUploadingCount(0);
@@ -351,11 +297,11 @@ export default function ImagePage() {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
             if (!blobs.length) {
-                message.error("剪切板里没有可读取的图片");
+                message.error(t("剪切板里没有可读取的图片"));
                 return;
             }
             setUploadingCount(blobs.length);
-            const hideLoading = message.loading("正在上传并读取参考图...", 0);
+            const hideLoading = message.loading(t("正在上传并读取参考图..."), 0);
             try {
                 const nextReferences = await Promise.all(
                     blobs.map(async (blob, index) => {
@@ -370,7 +316,7 @@ export default function ImagePage() {
                 setUploadingCount(0);
             }
         } catch {
-            message.error("剪切板里没有可读取的图片");
+            message.error(t("剪切板里没有可读取的图片"));
             setUploadingCount(0);
         }
     };
@@ -379,34 +325,16 @@ export default function ImagePage() {
         const reference = references.find((item) => item.id === id);
         setReferences((value) => value.filter((ref) => ref.id !== id));
         if (!reference || !shouldDeleteReferenceFile(reference, logs, results)) {
-            message.success("已从工作台移除参考图");
+            message.success(t("已从工作台移除参考图"));
             return;
         }
         if (reference?.storageKey) {
             try {
                 await deleteStoredImages([reference.storageKey]);
             } catch (error) {
-                message.error(error instanceof Error ? error.message : "参考图文件删除失败");
+                message.error(error instanceof Error ? error.message : t("参考图文件删除失败"));
             }
         }
-    };
-
-    const pastePromptFromClipboard = async () => {
-        try {
-            const text = (await navigator.clipboard.readText()).trim();
-            if (!text) {
-                message.error("剪切板里没有可读取的文本");
-                return;
-            }
-            setPrompt(text);
-            message.success("已读取剪切板文本");
-        } catch {
-            message.error("剪切板里没有可读取的文本");
-        }
-    };
-
-    const clearPrompt = () => {
-        setPrompt("");
     };
 
     const generate = async () => {
@@ -456,7 +384,7 @@ export default function ImagePage() {
             const markedReference = { id: nanoid(), name: "mask-edit.png", type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey, temporary: true };
             await submitGenerationBatch({ ...snapshot, references: [markedReference] });
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "局部重绘失败");
+            message.error(error instanceof Error ? error.message : t("局部重绘失败"));
         }
     };
 
@@ -494,7 +422,7 @@ export default function ImagePage() {
         const settled = await Promise.allSettled(pendingLogs.map((log, index) => createPersistentImageTask(log, snapshot, index, taskCount, workflowToken)));
         if (!active()) return;
         const createdCount = settled.filter((item) => item.status === "fulfilled").length;
-        if (createdCount) message.success(`已创建 ${createdCount} 个图片任务`);
+        if (createdCount) message.success(t("已创建 {createdCount} 个图片任务", { createdCount }));
         if (createdCount < pendingLogs.length) message.warning(`${pendingLogs.length - createdCount} 个图片任务创建失败`);
     };
 
@@ -503,9 +431,9 @@ export default function ImagePage() {
         try {
             let task: CanvasImageTask;
             if (snapshot.workflowRef) {
-                if (!workflowToken) throw new Error("工作流生成需要先登录");
+                if (!workflowToken) throw new Error(t("工作流生成需要先登录"));
                 const referenceImages = await Promise.all(snapshot.references.map(imageToDataUrl));
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 const created = await submitWorkflowTask(workflowToken, {
                     ref: snapshot.workflowRef,
                     expectedCapability: "image",
@@ -519,7 +447,7 @@ export default function ImagePage() {
                     sourceId: pendingLog.id,
                     clientTaskId: imageLogTaskId(pendingLog),
                 });
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 task = { id: created.id, status: created.status, progress: created.progress, source: "workflow", source_id: pendingLog.id };
             } else {
                 task = await createCanvasImageTask(
@@ -531,7 +459,7 @@ export default function ImagePage() {
             }
             const nextLog = { ...pendingLog, task, lastPolledAt: Date.now() };
             await saveLog(nextLog, active);
-            if (!active()) throw new Error("登录状态已变化");
+            if (!active()) throw new Error(t("登录状态已变化"));
             setResults((value) => updateResultByLogId(value, pendingLog.id, { taskLogId: nextLog.id, task, progress: task.progress, lastPolledAt: nextLog.lastPolledAt }));
             return nextLog;
         } catch (error) {
@@ -572,7 +500,7 @@ export default function ImagePage() {
                 });
 
                 if (!image) {
-                    throw new Error("接口没有返回图片");
+                    throw new Error(t("接口没有返回图片"));
                 }
 
                 const durableImage = {
@@ -600,7 +528,7 @@ export default function ImagePage() {
                         categoryIds: activeResultCategoryId ? [activeResultCategoryId] : [],
                     }),
                 );
-                message.success("图片已生成");
+                message.success(t("图片已生成"));
             } catch (err) {
                 const errMsg = errorMessage(err);
                 const errDetail = errorDetail(err);
@@ -622,7 +550,7 @@ export default function ImagePage() {
                         categoryIds: activeResultCategoryId ? [activeResultCategoryId] : [],
                     }),
                 );
-                message.error(errMsg || "生成失败");
+                message.error(errMsg || t("生成失败"));
             } finally {
                 // 任务完成，从进行中状态移除
                 setResults((value) => value.filter((item) => item.id !== id));
@@ -639,7 +567,7 @@ export default function ImagePage() {
             const blob = await response.blob();
             saveAs(blob, `image-${index + 1}.${imageExtension(image.mimeType || blob.type || dataUrl || image.dataUrl)}`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "图片下载失败");
+            message.error(error instanceof Error ? error.message : t("图片下载失败"));
         }
     };
 
@@ -653,9 +581,9 @@ export default function ImagePage() {
                 const stored = await uploadImage(source || image.dataUrl);
                 setReferences((value) => [...value, { id: nanoid(), name: `result-${index + 1}.png`, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey, source: "result", temporary: false }]);
             }
-            message.success("已加入参考图");
+            message.success(t("已加入参考图"));
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "加入参考图失败");
+            message.error(error instanceof Error ? error.message : t("加入参考图失败"));
         }
     };
 
@@ -679,23 +607,23 @@ export default function ImagePage() {
             data: { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
             metadata: { source: "image-page", prompt },
         });
-        message.success("已加入我的素材");
+        message.success(t("已加入我的素材"));
     };
 
     const syncImage = async (image: GeneratedImage, index: number) => {
         if (image.storageKey?.startsWith("server:") || syncingImageIds.includes(image.id)) return null;
         setSyncingImageIds((ids) => Array.from(new Set([...ids, image.id])));
-        const hideLoading = message.loading("正在同步图片到云端存储...", 0);
+        const hideLoading = message.loading(t("正在同步图片到云端存储..."), 0);
         try {
             const uploaded = await uploadRemoteImageToServer(image.dataUrl, "image-" + (index + 1) + "." + imageExtension(image.mimeType || image.dataUrl));
-            message.success("图片已同步到云端存储");
+            message.success(t("图片已同步到云端存储"));
             return { ...image, dataUrl: uploaded.url, storageKey: uploaded.storageKey, width: uploaded.width || image.width, height: uploaded.height || image.height, bytes: uploaded.bytes || image.bytes, mimeType: uploaded.mimeType || image.mimeType };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "";
             if (errorMessage.includes("服务端对象存储未启用") || errorMessage.includes("用户对象存储配置不完整")) {
-                message.error("未添加云存储");
+                message.error(t("未添加云存储"));
             } else {
-                message.error(errorMessage || "图片同步失败");
+                message.error(errorMessage || t("图片同步失败"));
             }
             return null;
         } finally {
@@ -742,7 +670,7 @@ export default function ImagePage() {
                     : (() => null)();
             if (reference) {
                 if (!reference.dataUrl) {
-                    message.error("引入素材失败：图片数据为空");
+                    message.error(t("引入素材失败：图片数据为空"));
                     return;
                 }
                 setReferences((value) => [...value, reference]);
@@ -751,7 +679,7 @@ export default function ImagePage() {
                 setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey, source: payload.source === "library" ? "library" : "upload", temporary: payload.source !== "library" }]);
             }
         } else {
-            message.warning("视频素材不能作为生图参考图");
+            message.warning(t("视频素材不能作为生图参考图"));
         }
         setAssetPickerOpen(false);
     };
@@ -806,10 +734,10 @@ export default function ImagePage() {
 
     const deleteLog = (log: GenerationLog) => {
         modal.confirm({
-            title: "删除生成结果",
-            content: "确定删除这条生成结果吗？",
-            okText: "删除",
-            cancelText: "取消",
+            title: t("删除生成结果"),
+            content: t("确定删除这条生成结果吗？"),
+            okText: t("删除"),
+            cancelText: t("取消"),
             okButtonProps: { danger: true },
             onOk: async () => {
                 const nextLogs = logs.filter((item) => item.id !== log.id);
@@ -938,7 +866,7 @@ export default function ImagePage() {
                     const current = await getWorkflowTask(context.token, imageLogTaskId(log), context.signal);
                     if (!active()) return null;
                     if (current.status === "succeeded") {
-                        if (!current.urls?.length) return { ...log.task!, id: current.id, status: "failed", progress: 100, error: { message: "工作流完成但没有返回图片" } };
+                        if (!current.urls?.length) return { ...log.task!, id: current.id, status: "failed", progress: 100, error: { message: t("工作流完成但没有返回图片") } };
                         const stored = await Promise.all(current.urls.map((url) => {
                             const storageKey = comfyOutputStorageKey(url);
                             return storageKey
@@ -951,8 +879,8 @@ export default function ImagePage() {
                     return { ...log.task!, id: current.id, status: current.status, progress: current.progress, error: current.error ? { message: current.error } : undefined };
                 } catch (error) {
                     if (!active() || error instanceof Error && error.name === "AbortError") return null;
-                    message.error(error instanceof Error ? error.message : "查询工作流任务失败");
-                    return { ...log.task!, status: isRetryableWorkflowError(error) ? "running" : "failed", error: { message: error instanceof Error ? error.message : "查询工作流任务失败" } };
+                    message.error(error instanceof Error ? error.message : t("查询工作流任务失败"));
+                    return { ...log.task!, status: isRetryableWorkflowError(error) ? "running" : "failed", error: { message: error instanceof Error ? error.message : t("查询工作流任务失败") } };
                 }
             }));
             const tasks = [...normalTasks, ...workflowTasks.filter((task): task is CanvasImageTask => task !== null)];
@@ -995,7 +923,7 @@ export default function ImagePage() {
     const createCategory = async (name: string) => {
         const trimmedName = name.trim();
         if (!trimmedName) {
-            message.error("请输入分类名称");
+            message.error(t("请输入分类名称"));
             return null;
         }
         const existing = categories.find((item) => item.name === trimmedName);
@@ -1011,22 +939,22 @@ export default function ImagePage() {
     const renameCategory = async (category: GenerationCategory, name: string) => {
         const trimmedName = name.trim();
         if (!trimmedName) {
-            message.error("请输入分类名称");
+            message.error(t("请输入分类名称"));
             return;
         }
         const nextCategories = categories.map((item) => (item.id === category.id ? { ...item, name: trimmedName } : item));
         setCategories(nextCategories);
         await categoryStore.setItem(CATEGORY_STORE_KEY, nextCategories);
         await persistImageHistory(logs, nextCategories);
-        message.success("已重命名分类");
+        message.success(t("已重命名分类"));
     };
 
     const deleteCategory = (category: GenerationCategory) => {
         modal.confirm({
-            title: "删除分类",
+            title: t("删除分类"),
             content: `确定删除分类「${category.name}」吗？分类内的生成结果会移至未分类。`,
-            okText: "删除",
-            cancelText: "取消",
+            okText: t("删除"),
+            cancelText: t("取消"),
             okButtonProps: { danger: true },
             onOk: async () => {
                 const nextCategories = categories.filter((item) => item.id !== category.id);
@@ -1036,7 +964,7 @@ export default function ImagePage() {
                 await categoryStore.setItem(CATEGORY_STORE_KEY, nextCategories);
                 await Promise.all(nextLogs.map((log) => logStore.setItem(log.id, serializeLog(log))));
                 await persistImageHistory(nextLogs, nextCategories);
-                message.success("已删除分类");
+                message.success(t("已删除分类"));
             },
         });
     };
@@ -1048,7 +976,7 @@ export default function ImagePage() {
         await logStore.setItem(log.id, serializeLog(nextLog));
         await persistImageHistory(nextLogs, categories);
         await refreshLogs();
-        message.success(categoryIds.length ? "已更新分类" : "已移至未分类");
+        message.success(categoryIds.length ? t("已更新分类") : t("已移至未分类"));
     };
 
     const toggleLogCategory = async (log: GenerationLog, categoryId: string) => {
@@ -1080,22 +1008,22 @@ export default function ImagePage() {
 
     const copyPrompt = async (text: string) => {
         await navigator.clipboard.writeText(text);
-        message.success("提示词已复制");
+        message.success(t("提示词已复制"));
     };
 
     const buildRequestSnapshot = ({ promptText = prompt, referenceItems = references, taskCount = generationCount, configOverride, workflowRef = config.imageWorkflowRef }: { promptText?: string; referenceItems?: ReferenceImage[]; taskCount?: number; configOverride?: Partial<GenerationLogConfig>; workflowRef?: WorkflowRef | null } = {}) => {
         const text = promptText.trim();
         if (!text && !workflowRef) {
-            message.error("请输入生图提示词");
+            message.error(t("请输入生图提示词"));
             return null;
         }
         const baseConfig = { ...effectiveConfig, ...configOverride };
         const requestModel = configOverride?.imageModel || configOverride?.model || model;
         const requestChannelId = resolveImageChannelId(baseConfig, requestModel, configOverride?.imageChannelId, configOverride?.activeChannelId, baseConfig.imageChannelId, baseConfig.activeChannelId);
         const requestConfig = { ...baseConfig, model: requestModel, imageModel: requestModel, activeChannelId: requestChannelId, imageChannelId: requestChannelId, count: "1" };
-        if (workflowRef && !token) { message.warning("工作流生成请先登录"); return null; }
+        if (workflowRef && !token) { message.warning(t("工作流生成请先登录")); return null; }
         if (!workflowRef && !isAiConfigReady(requestConfig, requestModel)) {
-            message.warning("请先完成配置");
+            message.warning(t("请先完成配置"));
             openConfigDialog(true);
             return null;
         }
@@ -1113,7 +1041,7 @@ export default function ImagePage() {
         try {
             const result = snapshot.references.length ? await requestEdit(snapshot.requestConfig, snapshot.text, snapshot.references) : await requestGeneration(snapshot.requestConfig, snapshot.text);
             const image = result[0];
-            if (!image) throw new Error("接口没有返回图片");
+            if (!image) throw new Error(t("接口没有返回图片"));
             const meta = image.width && image.height && image.mimeType ? { width: image.width, height: image.height, mimeType: image.mimeType } : await readImageMeta(image.dataUrl);
             const nextImage: GeneratedImage = { ...image, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: image.bytes || getDataUrlByteSize(image.dataUrl), mimeType: image.mimeType || meta.mimeType };
             setResults((value) => updateResult(value, resultId, { status: "success", image: nextImage, durationMs: nextImage.durationMs }));
@@ -1224,6 +1152,42 @@ export default function ImagePage() {
         );
     };
 
+    const workflowHandlersRef = useRef({
+        start: handleWorkflowTaskStarted,
+        success: handleWorkflowTaskSuccess,
+        failure: handleWorkflowTaskFailure,
+    });
+    workflowHandlersRef.current = {
+        start: handleWorkflowTaskStarted,
+        success: handleWorkflowTaskSuccess,
+        failure: handleWorkflowTaskFailure,
+    };
+
+    useEffect(() => {
+        const onStart = (event: Event) => workflowHandlersRef.current.start((event as CustomEvent<WorkflowExternalTaskStart>).detail);
+        const onSuccess = (event: Event) => workflowHandlersRef.current.success((event as CustomEvent<WorkflowExternalTaskSuccess>).detail);
+        const onFailure = (event: Event) => workflowHandlersRef.current.failure((event as CustomEvent<WorkflowExternalTaskFailure>).detail);
+        const onSaved = () => {
+            void (async () => {
+                const nextCategories = await readStoredCategories();
+                const nextLogs = await readStoredLogs();
+                setCategories(nextCategories);
+                setLogs(nextLogs);
+                await persistImageHistory(nextLogs, nextCategories);
+            })();
+        };
+        window.addEventListener(WORKFLOW_TASK_STARTED_EVENT, onStart);
+        window.addEventListener(WORKFLOW_TASK_SUCCESS_EVENT, onSuccess);
+        window.addEventListener(WORKFLOW_TASK_FAILURE_EVENT, onFailure);
+        window.addEventListener(WORKFLOW_LOG_SAVED_EVENT, onSaved);
+        return () => {
+            window.removeEventListener(WORKFLOW_TASK_STARTED_EVENT, onStart);
+            window.removeEventListener(WORKFLOW_TASK_SUCCESS_EVENT, onSuccess);
+            window.removeEventListener(WORKFLOW_TASK_FAILURE_EVENT, onFailure);
+            window.removeEventListener(WORKFLOW_LOG_SAVED_EVENT, onSaved);
+        };
+    }, []);
+
     return (
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
             <main className={`${workbenchLayout === "side" ? "grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)]" : "relative flex flex-col"} min-h-0 flex-1 gap-3 overflow-y-auto p-3 lg:overflow-hidden`}>
@@ -1244,8 +1208,7 @@ export default function ImagePage() {
                             onPromptChange={setPrompt}
                             onOpenPromptLibrary={() => setPromptDialogOpen(true)}
                             onOpenAssetPicker={() => setAssetPickerOpen(true)}
-                            onPastePrompt={() => void pastePromptFromClipboard()}
-                            onClearPrompt={clearPrompt}
+                            onAddReferenceFiles={(files) => void addReferences(files)}
                             onPasteReferences={() => void addReferencesFromClipboard()}
                             onUploadReferences={() => fileInputRef.current?.click()}
                             onRemoveReference={(id) => void removeReference(id)}
@@ -1289,7 +1252,7 @@ export default function ImagePage() {
                 ) : (
                     <>
                         <ResultsPanel
-                            className="min-h-[360px] flex-1 pb-40 lg:pb-44"
+                            className="min-h-0 flex-1"
                             results={results}
                             logs={logs}
                             categories={categories}
@@ -1337,8 +1300,7 @@ export default function ImagePage() {
                             onPromptChange={setPrompt}
                             onOpenPromptLibrary={() => setPromptDialogOpen(true)}
                             onOpenAssetPicker={() => setAssetPickerOpen(true)}
-                            onPastePrompt={() => void pastePromptFromClipboard()}
-                            onClearPrompt={clearPrompt}
+                            onAddReferenceFiles={(files) => void addReferences(files)}
                             onPasteReferences={() => void addReferencesFromClipboard()}
                             onUploadReferences={() => fileInputRef.current?.click()}
                             onRemoveReference={(id) => void removeReference(id)}
@@ -1348,48 +1310,6 @@ export default function ImagePage() {
                     </>
                 )}
             </main>
-            <button
-                ref={workflowButtonRef}
-                type="button"
-                className="fixed z-50 inline-flex touch-none select-none items-center gap-2 rounded-full border border-sky-300/70 bg-white/90 px-4 py-3 text-sm font-semibold text-stone-950 shadow-[0_18px_50px_rgba(14,165,233,0.28),0_8px_18px_rgba(0,0,0,0.14)] ring-1 ring-white/70 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white hover:shadow-[0_22px_64px_rgba(14,165,233,0.36),0_10px_22px_rgba(0,0,0,0.18)] dark:border-sky-400/40 dark:bg-stone-900/88 dark:text-stone-100 dark:ring-white/10 dark:hover:bg-stone-900"
-                style={{
-                    left: (typeof window === "undefined" ? defaultWorkflowButtonPosition() : clampWorkflowButtonPosition(workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition())).x,
-                    top: (typeof window === "undefined" ? defaultWorkflowButtonPosition() : clampWorkflowButtonPosition(workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition())).y
-                }}
-                onPointerDown={handleWorkflowButtonPointerDown}
-                onPointerMove={handleWorkflowButtonPointerMove}
-                onPointerUp={handleWorkflowButtonPointerUp}
-                onClick={() => {
-                    if (workflowButtonDragRef.current?.moved) {
-                        workflowButtonDragRef.current = null;
-                        return;
-                    }
-                    workflowButtonDragRef.current = null;
-                    setWorkflowDrawerOpen(true);
-                }}
-            >
-                <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.9)]" />
-                <WandSparkles className="size-4 text-sky-500 dark:text-sky-300" />
-                工作流
-            </button>
-            <Drawer title="创作工作流" placement="right" size="min(1120px, 92vw)" open={workflowDrawerOpen}  onClose={() => setWorkflowDrawerOpen(false)} styles={{ body: { padding: 0 } }} destroyOnHidden={false}>
-                <CreativeWorkflowWorkspace
-                    embedded
-                    hideTaskList
-                    onWorkflowTaskStarted={handleWorkflowTaskStarted}
-                    onWorkflowTaskSuccess={handleWorkflowTaskSuccess}
-                    onWorkflowTaskFailure={handleWorkflowTaskFailure}
-                    onGenerationLogSaved={() => {
-                        void (async () => {
-                            const nextCategories = await readStoredCategories();
-                            const nextLogs = await readStoredLogs();
-                            setCategories(nextCategories);
-                            setLogs(nextLogs);
-                            await persistImageHistory(nextLogs, nextCategories);
-                        })();
-                    }}
-                />
-            </Drawer>
             <input
                 ref={fileInputRef}
                 type="file"
@@ -1416,18 +1336,18 @@ export default function ImagePage() {
                     onConfirm={(payload) => void submitMaskEdit(payload)}
                 />
             ) : null}
-            <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
-                确定删除选中的 {selectedLogIds.length} 条生成记录吗？
+            <Modal title={t("删除生成记录")} open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText={t("删除")} okButtonProps={{ danger: true }} cancelText={t("取消")}>
+                {t("确定删除选中的")} {selectedLogIds.length} {t("条生成记录吗？")}
             </Modal>
         </div>
     );
 }
 
 const quickQualityOptions = [
-    { value: "auto", label: "自动" },
-    { value: "high", label: "高" },
-    { value: "medium", label: "中" },
-    { value: "low", label: "低" },
+    { value: "auto", get label() { return t("自动"); } },
+    { value: "high", get label() { return t("高"); } },
+    { value: "medium", get label() { return t("中"); } },
+    { value: "low", get label() { return t("低"); } },
 ];
 
 function WorkbenchPanel({
@@ -1445,8 +1365,7 @@ function WorkbenchPanel({
     onPromptChange,
     onOpenPromptLibrary,
     onOpenAssetPicker,
-    onPastePrompt,
-    onClearPrompt,
+    onAddReferenceFiles,
     onPasteReferences,
     onUploadReferences,
     onRemoveReference,
@@ -1467,95 +1386,42 @@ function WorkbenchPanel({
     onPromptChange: (value: string) => void;
     onOpenPromptLibrary: () => void;
     onOpenAssetPicker: () => void;
-    onPastePrompt: () => void;
-    onClearPrompt: () => void;
+    onAddReferenceFiles: (files: File[]) => void;
     onPasteReferences: () => void;
     onUploadReferences: () => void;
     onRemoveReference: (id: string) => void;
     onGenerate: () => void;
     uploadingCount: number;
 }) {
-    const [bottomSettingsCollapsed, setBottomSettingsCollapsed] = useState(true);
+    const handlePromptPaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+        const imageFiles = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/"));
+        if (!imageFiles.length) return;
+        event.preventDefault();
+        onAddReferenceFiles(imageFiles);
+    };
 
     if (layout === "bottom") {
         return (
-            <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-5 sm:bottom-7 sm:px-10 lg:px-16">
-                <div className="pointer-events-auto w-full max-w-5xl rounded-[24px] bg-white/65 p-4 shadow-[0_32px_100px_rgba(15,23,42,.22),0_10px_34px_rgba(15,23,42,.10)] ring-1 ring-white/50 backdrop-blur-2xl dark:bg-stone-950/60 dark:ring-white/10 dark:shadow-[0_34px_110px_rgba(0,0,0,.58)]">
-                    <div className="flex flex-col gap-3">
-                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                            <Input.TextArea
-                                value={prompt}
-                                onChange={(event) => onPromptChange(event.target.value)}
-                                placeholder="描述你想生成的图片，可输入 @ 来指定参考图..."
-                                autoSize={{ minRows: 2, maxRows: 4 }}
-                                className="rounded-2xl"
-                                onPressEnter={(event) => {
-                                    if (!event.shiftKey && canGenerate) onGenerate();
-                                }}
-                            />
-                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                                <Button title="清空输入" icon={<Trash2 className="size-4" />} onClick={onClearPrompt} />
-                                <Button title="提示词库" icon={<BookOpen className="size-4" />} onClick={onOpenPromptLibrary} />
-                                <Button title="我的素材" icon={<FolderPlus className="size-4" />} onClick={onOpenAssetPicker} />
-                                <Button
-                                    title="参数配置"
-                                    className={`lg:hidden ${!bottomSettingsCollapsed ? "!bg-sky-500/10 !text-sky-500 !border-sky-500/30" : ""}`}
-                                    icon={<SlidersHorizontal className="size-4" />}
-                                    onClick={() => setBottomSettingsCollapsed(!bottomSettingsCollapsed)}
-                                />
-                                <Button title="切换到侧边工作台" icon={<PanelLeft className="size-4" />} onClick={() => onLayoutChange("side")} />
-                                <Button type="primary" className="h-9 rounded-xl lg:!hidden font-medium px-4" icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                                    {pendingCount ? `${pendingCount} 生成中` : "开始创作"}
-                                </Button>
-                            </div>
-                        </div>
-                        <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-[1.3fr_1.1fr_0.9fr_0.9fr_0.9fr_0.85fr_0.8fr_0.8fr_auto_auto] ${bottomSettingsCollapsed ? "hidden lg:grid" : "grid"}`}>
-                            <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-                                模型
-                                <ModelPicker
-                                    config={config}
-                                    value={model}
-                                    capability="image"
-                                    channelId={config.imageChannelId}
-                                    workflowRef={config.imageWorkflowRef}
-                                    onWorkflowChange={(value) => updateConfig("imageWorkflowRef", value)}
-                                    onChange={(value, channelId) => {
-                                        updateConfig("imageModel", value);
-                                        if (channelId) updateConfig("imageChannelId", channelId);
-                                    }}
-                                    className="canvas-compact-control !h-11 !rounded-xl"
-                                    onMissingConfig={() => openConfigDialog(false)}
-                                    fullWidth
-                                />
-                            </label>
-                            <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-                                接口模式
-                                <div className="flex h-11 items-center rounded-xl border border-stone-200 bg-background px-2.5 dark:border-stone-800">
-                                    <Segmented
-                                        size="small"
-                                        className="canvas-config-mode !rounded-md !p-0.5 w-full"
-                                        value={config.apiMode}
-                                        onChange={(value) => updateConfig("apiMode", value as "images" | "responses" | "chat")}
-                                        options={[
-                                            { value: "images", label: "images" },
-                                            { value: "responses", label: "responses" },
-                                            { value: "chat", label: "chat" },
-                                        ]}
-                                    />
-                                </div>
-                            </label>
-                            <QuickSelect label="尺寸" value={config.size || "auto"} options={imageSizeOptions} onChange={(value) => updateConfig("size", value)} />
-                            <QuickSelect label="质量" value={config.quality || "auto"} options={quickQualityOptions} onChange={(value) => updateConfig("quality", value)} />
-                            <QuickNumber label="数量" value={config.count || "1"} min={1} max={10} onChange={(value) => updateConfig("count", value)} />
-                            <ReferenceQuickActions references={references} onUploadReferences={onUploadReferences} />
-                            <Button type="primary" className="h-11 min-w-28 rounded-xl hidden lg:inline-flex" icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                                {pendingCount ? `${pendingCount} 生成中` : "开始创作"}
-                            </Button>
-                        </div>
-                        {references.length || uploadingCount > 0 ? <ReferenceStrip className="mt-3" references={references} compact onRemoveReference={onRemoveReference} uploadingCount={uploadingCount} /> : null}
-                    </div>
-                </div>
-            </div>
+            <BottomComposer
+                prompt={prompt}
+                references={references}
+                config={config}
+                model={model}
+                canGenerate={canGenerate}
+                pendingCount={pendingCount}
+                uploadingCount={uploadingCount}
+                updateConfig={updateConfig}
+                openConfigDialog={openConfigDialog}
+                onLayoutChange={onLayoutChange}
+                onPromptChange={onPromptChange}
+                onPromptPaste={handlePromptPaste}
+                onOpenAssetPicker={onOpenAssetPicker}
+                onAddReferenceFiles={onAddReferenceFiles}
+                onPasteReferences={onPasteReferences}
+                onUploadReferences={onUploadReferences}
+                onRemoveReference={onRemoveReference}
+                onGenerate={onGenerate}
+            />
         );
     }
 
@@ -1566,32 +1432,43 @@ function WorkbenchPanel({
             </div>
             <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
                 <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
-                    <div className="px-3 py-2">
-                        <span className="font-medium text-sm">提示词</span>
-                    </div>
-                    <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPastePrompt}>读取剪贴板</Button>
-                            <Button size="small" icon={<Trash2 className="size-3.5" />} onClick={onClearPrompt}>清空</Button>
-                            <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary}>提示词库</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker}>我的素材</Button>
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <span className="font-medium text-sm">{t("提示词")}</span>
+                        <div className="flex items-center gap-0.5">
+                            <Button type="text" size="small" className="!px-1.5" title={t("提示词库")} icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary} />
+                            <Button type="text" size="small" className="!px-1.5" title={t("我的素材")} icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker} />
                         </div>
-                        <Input.TextArea value={prompt} onChange={(event) => onPromptChange(event.target.value)} rows={6} placeholder="描述画面主体、风格、构图、光线和用途" />
+                    </div>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <Input.TextArea
+                            value={prompt}
+                            onChange={(event) => onPromptChange(event.target.value)}
+                            onPaste={handlePromptPaste}
+                            rows={6}
+                            placeholder={t("描述画面主体、风格、构图、光线和用途。可直接 Ctrl+V 粘贴文本，粘贴图片会加入参考图")}
+                        />
                     </div>
                 </section>
 
                 <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
-                    <div className="flex items-center gap-2 px-3 py-2">
-                        <span className="font-medium text-sm">参考图</span>
-                        <Tag className="m-0 text-xs">{references.length}</Tag>
-                    </div>
-                    <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteReferences}>剪切板</Button>
-                            <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>上传</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker}>从素材库选择</Button>
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{t("参考图")}</span>
+                            <Tag className="m-0 text-xs">{references.length}</Tag>
                         </div>
-                        <ReferenceStrip references={references} onRemoveReference={onRemoveReference} uploadingCount={uploadingCount} />
+                        <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker} />
+                    </div>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <ReferenceStrip
+                            references={references}
+                            interactive
+                            onRemoveReference={onRemoveReference}
+                            uploadingCount={uploadingCount}
+                            onUploadReferences={onUploadReferences}
+                            onAddReferenceFiles={onAddReferenceFiles}
+                            onPasteReferences={onPasteReferences}
+                            onOpenAssetPicker={onOpenAssetPicker}
+                        />
                     </div>
                 </section>
 
@@ -1601,8 +1478,180 @@ function WorkbenchPanel({
             </div>
             <div className="shrink-0 border-t border-stone-200 p-4 dark:border-stone-800">
                 <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                    {pendingCount ? `继续提交（${pendingCount} 个生成中）` : "开始生成"}
+                    {pendingCount ? t("继续提交（{pendingCount} 个生成中）", { pendingCount }) : t("开始生成")}
                 </Button>
+            </div>
+        </div>
+    );
+}
+
+function BottomComposer({
+    prompt,
+    references,
+    config,
+    model,
+    canGenerate,
+    pendingCount,
+    uploadingCount,
+    updateConfig,
+    openConfigDialog,
+    onLayoutChange,
+    onPromptChange,
+    onPromptPaste,
+    onOpenAssetPicker,
+    onAddReferenceFiles,
+    onPasteReferences,
+    onUploadReferences,
+    onRemoveReference,
+    onGenerate,
+}: {
+    prompt: string;
+    references: ReferenceImage[];
+    config: AiConfig;
+    model: string;
+    canGenerate: boolean;
+    pendingCount: number;
+    uploadingCount: number;
+    updateConfig: UpdateAiConfig;
+    openConfigDialog: (shouldPromptContinue?: boolean) => void;
+    onLayoutChange: (layout: WorkbenchLayout) => void;
+    onPromptChange: (value: string) => void;
+    onPromptPaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void;
+    onOpenAssetPicker: () => void;
+    onAddReferenceFiles: (files: File[]) => void;
+    onPasteReferences: () => void;
+    onUploadReferences: () => void;
+    onRemoveReference: (id: string) => void;
+    onGenerate: () => void;
+}) {
+    const [dragOver, setDragOver] = useState(false);
+    const hasReferences = references.length > 0 || uploadingCount > 0;
+
+    const acceptDroppedImages = (event: ReactDragEvent) => {
+        event.preventDefault();
+        setDragOver(false);
+        const files = Array.from(event.dataTransfer.files || []).filter((file) => file.type.startsWith("image/"));
+        if (files.length) onAddReferenceFiles(files);
+    };
+
+    return (
+        <div className="relative z-40 w-full shrink-0">
+            <div
+                className={`w-full rounded-2xl border px-4 pb-4 pt-4 shadow-[0_24px_80px_rgba(15,23,42,.18)] backdrop-blur-xl transition-colors dark:shadow-[0_28px_90px_rgba(0,0,0,.55)] sm:px-5 sm:pb-5 sm:pt-5 ${
+                    dragOver
+                        ? "border-sky-400/80 bg-sky-50/90 dark:border-sky-400/50 dark:bg-sky-950/70"
+                        : "border-stone-200/80 bg-white/90 dark:border-white/10 dark:bg-[#161616]/92"
+                }`}
+                onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOver(false);
+                }}
+                onDrop={acceptDroppedImages}
+            >
+                {hasReferences ? (
+                    <div className="mb-3">
+                        <ReferenceStrip
+                            references={references}
+                            compact
+                            interactive
+                            onRemoveReference={onRemoveReference}
+                            uploadingCount={uploadingCount}
+                            onUploadReferences={onUploadReferences}
+                            onAddReferenceFiles={onAddReferenceFiles}
+                            onPasteReferences={onPasteReferences}
+                            onOpenAssetPicker={onOpenAssetPicker}
+                        />
+                    </div>
+                ) : null}
+
+                <Input.TextArea
+                    value={prompt}
+                    onChange={(event) => onPromptChange(event.target.value)}
+                    onPaste={onPromptPaste}
+                    placeholder={dragOver ? t("松开以添加参考图") : t("描述画面主体、风格、构图与光线。可 Ctrl+V 粘贴文本，粘贴图片会加入参考图")}
+                    autoSize={{ minRows: 4, maxRows: 10 }}
+                    className="!min-h-28 !resize-none !border-0 !bg-transparent !p-1 !shadow-none !outline-none focus:!shadow-none dark:!bg-transparent"
+                    onPressEnter={(event) => {
+                        if (!event.shiftKey && canGenerate) {
+                            event.preventDefault();
+                            onGenerate();
+                        }
+                    }}
+                />
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                        <Dropdown
+                            trigger={["click"]}
+                            menu={{
+                                items: [
+                                    { key: "upload", icon: <Upload className="size-4" />, label: t("上传参考图") },
+                                    { key: "assets", icon: <FolderOpen className="size-4" />, label: t("我的素材") },
+                                ],
+                                onClick: ({ key }) => (key === "upload" ? onUploadReferences() : onOpenAssetPicker()),
+                            }}
+                        >
+                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Plus className="size-4" />} aria-label={t("添加素材")} title={t("添加素材")} />
+                        </Dropdown>
+                        <CanvasPromptPopover onSelect={onPromptChange} />
+                        <div className="min-w-0 max-w-[168px]">
+                            <ModelPicker
+                                config={config}
+                                value={model}
+                                capability="image"
+                                channelId={config.imageChannelId}
+                                workflowRef={config.imageWorkflowRef}
+                                onWorkflowChange={(value) => updateConfig("imageWorkflowRef", value)}
+                                onChange={(value, channelId) => {
+                                    updateConfig("imageModel", value);
+                                    if (channelId) updateConfig("imageChannelId", channelId);
+                                }}
+                                className="canvas-compact-control !h-8 !rounded-full"
+                                onMissingConfig={() => openConfigDialog(false)}
+                                fullWidth
+                            />
+                        </div>
+                        <CanvasImageSettingsPopover
+                            config={config}
+                            placement="topLeft"
+                            buttonIcon={<ImageIcon className="size-3.5" />}
+                            buttonClassName="!h-8 !max-w-[150px] !justify-start !rounded-full !px-2.5"
+                            onConfigChange={(key, value) => updateConfig(key, value)}
+                        />
+                        <Segmented
+                            size="small"
+                            className="canvas-config-mode !rounded-full !p-0.5"
+                            value={config.apiMode}
+                            onChange={(value) => updateConfig("apiMode", value as "images" | "responses" | "chat")}
+                            options={[
+                                { value: "images", label: "images" },
+                                { value: "responses", label: "responses" },
+                                { value: "chat", label: "chat" },
+                            ]}
+                        />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                        <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<PanelLeft className="size-4" />} title={t("切换到侧边工作台")} onClick={() => onLayoutChange("side")} />
+                        <Button
+                            type="primary"
+                            shape="circle"
+                            className="!size-10 !min-w-10"
+                            disabled={!canGenerate}
+                            onClick={onGenerate}
+                            aria-label={pendingCount ? t("继续生成") : t("开始生成")}
+                            title={pendingCount ? t("{pendingCount} 生成中", { pendingCount }) : t("开始生成")}
+                            icon={pendingCount ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                        />
+                    </div>
+                </div>
+
             </div>
         </div>
     );
@@ -1612,29 +1661,112 @@ function WorkbenchHeader({ currentLayout, onLayoutChange, compact = false }: { c
     return (
         <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-                <h1 className={`${compact ? "text-base" : "text-2xl"} font-semibold text-stone-950 dark:text-stone-100`}>生图工作台</h1>
+                <h1 className={`${compact ? "text-base" : "text-2xl"} font-semibold text-stone-950 dark:text-stone-100`}>{t("生图工作台")}</h1>
             </div>
             <div className="flex shrink-0 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-900">
                 <Button size="small" type={currentLayout === "side" ? "primary" : "text"} icon={<PanelLeft className="size-3.5" />} onClick={() => onLayoutChange("side")}>
-                    侧边
+                    
+                    {t("侧边")}
                 </Button>
                 <Button size="small" type={currentLayout === "bottom" ? "primary" : "text"} icon={<PanelBottom className="size-3.5" />} onClick={() => onLayoutChange("bottom")}>
-                    底部
+                    
+                    {t("底部")}
                 </Button>
             </div>
         </div>
     );
 }
 
-function ReferenceStrip({ references, compact = false, className = "", onRemoveReference, uploadingCount = 0 }: { references: ReferenceImage[]; compact?: boolean; className?: string; onRemoveReference: (id: string) => void; uploadingCount?: number }) {
+function ReferenceStrip({
+    references,
+    compact = false,
+    className = "",
+    interactive = false,
+    onRemoveReference,
+    uploadingCount = 0,
+    onUploadReferences,
+    onAddReferenceFiles,
+    onPasteReferences,
+    onOpenAssetPicker,
+}: {
+    references: ReferenceImage[];
+    compact?: boolean;
+    className?: string;
+    interactive?: boolean;
+    onRemoveReference: (id: string) => void;
+    uploadingCount?: number;
+    onUploadReferences?: () => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+    onPasteReferences?: () => void;
+    onOpenAssetPicker?: () => void;
+}) {
+    const [dragOver, setDragOver] = useState(false);
+    const empty = !references.length && !uploadingCount;
+
     return (
         <div
-            className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed border-stone-300 p-2 overscroll-x-contain dark:border-stone-700 ${compact ? "min-h-14" : "min-h-24 pb-3"} ${className}`}
+            tabIndex={interactive ? 0 : undefined}
+            role={interactive ? "button" : undefined}
+            className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed p-2 overscroll-x-contain outline-none transition ${compact ? "min-h-14" : "min-h-24 pb-3"} ${dragOver ? "border-sky-400 bg-sky-50/60 dark:border-sky-500 dark:bg-sky-950/30" : "border-stone-300 dark:border-stone-700"} ${interactive ? "cursor-pointer hover:border-stone-400 dark:hover:border-stone-500" : ""} ${className}`}
             onWheel={(event) => {
                 if (event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return;
                 event.preventDefault();
                 event.currentTarget.scrollLeft += event.deltaY;
             }}
+            onClick={
+                interactive
+                    ? (event) => {
+                          if ((event.target as HTMLElement).closest("button, .ant-image")) return;
+                          onUploadReferences?.();
+                      }
+                    : undefined
+            }
+            onDragEnter={
+                interactive
+                    ? (event) => {
+                          event.preventDefault();
+                          setDragOver(true);
+                      }
+                    : undefined
+            }
+            onDragOver={
+                interactive
+                    ? (event) => {
+                          event.preventDefault();
+                          setDragOver(true);
+                      }
+                    : undefined
+            }
+            onDragLeave={
+                interactive
+                    ? (event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOver(false);
+                      }
+                    : undefined
+            }
+            onDrop={
+                interactive
+                    ? (event) => {
+                          event.preventDefault();
+                          setDragOver(false);
+                          const files = Array.from(event.dataTransfer.files || []).filter((file) => file.type.startsWith("image/"));
+                          if (files.length) onAddReferenceFiles?.(files);
+                      }
+                    : undefined
+            }
+            onPaste={
+                interactive
+                    ? (event) => {
+                          const imageFiles = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/"));
+                          if (imageFiles.length) {
+                              event.preventDefault();
+                              onAddReferenceFiles?.(imageFiles);
+                              return;
+                          }
+                          onPasteReferences?.();
+                      }
+                    : undefined
+            }
         >
             {references.map((item) => (
                 <div key={item.id} className={`${compact ? "size-12" : "size-20"} group relative shrink-0 overflow-hidden rounded-md border border-stone-200 dark:border-stone-800`}>
@@ -1647,7 +1779,7 @@ function ReferenceStrip({ references, compact = false, className = "", onRemoveR
                             mask: "点击预览",
                         }}
                     />
-                    <button type="button" className="absolute right-1 top-1 hidden z-10 size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label="移除参考图">
+                    <button type="button" className="absolute right-1 top-1 hidden z-10 size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label={t("移除参考图")}>
                         <Trash2 className="size-3.5" />
                     </button>
                 </div>
@@ -1657,17 +1789,12 @@ function ReferenceStrip({ references, compact = false, className = "", onRemoveR
                     <LoaderCircle className="size-5 animate-spin text-stone-400" />
                 </div>
             ))}
-            {!references.length && !uploadingCount ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">暂无参考图</div> : null}
-        </div>
-    );
-}
-
-function ReferenceQuickActions({ references, onUploadReferences }: { references: ReferenceImage[]; onUploadReferences: () => void }) {
-    return (
-        <div className="flex h-11 items-center gap-1 rounded-xl border border-stone-200 bg-background px-2 dark:border-stone-800">
-            {references[0] ? <img src={references[0].dataUrl || undefined} alt={references[0].name} className="size-7 rounded object-cover" /> : null}
-            {references.length ? <span className="min-w-7 text-xs text-stone-500">{references.length} 张</span> : null}
-            <Button size="small" type="text" icon={<Upload className="size-3.5" />} onClick={onUploadReferences} />
+            {empty ? (
+                <div className="flex min-w-full flex-col items-center justify-center gap-1 px-3 text-center text-sm text-stone-500">
+                    <span>{dragOver ? t("松开以添加参考图") : t("点击上传，或拖拽 / Ctrl+V 粘贴图片")}</span>
+                    {interactive && onOpenAssetPicker ? <span className="text-xs opacity-70">{t("也可使用右上角从素材库选择")}</span> : null}
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -1710,7 +1837,7 @@ function settingsSummary(config: AiConfig, model: string) {
         imageSizeLabel(config.size || "auto"),
         imageQualityLabel(config.quality || "auto"),
         `${config.count || "1"} 张`,
-        config.apiMode !== "chat" && config.streamImages ? `流式 ${config.streamPartialImages || "1"}` : "非流式",
+        config.apiMode !== "chat" && config.streamImages ? `流式 ${config.streamPartialImages || "1"}` : t("非流式"),
     ].join(" · ");
 }
 
@@ -1798,7 +1925,7 @@ function ResultsPanel({
     const createCategory = async () => {
         const name = categoryName.trim();
         if (!name) {
-            message.error("请输入分类名称");
+            message.error(t("请输入分类名称"));
             return;
         }
         const category = await onCreateCategory(name);
@@ -1816,14 +1943,15 @@ function ResultsPanel({
             <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                     <History className="size-4 text-stone-400" />
-                    <h2 className="truncate text-xl font-semibold">{activeCategory ? activeCategory.name : "全部结果"}</h2>
+                    <h2 className="truncate text-xl font-semibold">{activeCategory ? activeCategory.name : t("全部结果")}</h2>
                     <Tag className="m-0">{totalCount}</Tag>
-                    {pendingCount ? <Tag className="m-0 px-2 py-1">{pendingCount} 个生成中</Tag> : null}
+                    {pendingCount ? <Tag className="m-0 px-2 py-1">{pendingCount}  {t("个生成中")}</Tag> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     {activeCategory ? (
                         <Button size="small" onClick={() => onActiveCategoryChange(null)}>
-                            返回分类
+                            
+                            {t("返回分类")}
                         </Button>
                     ) : null}
                     <div className="flex shrink-0 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-900">
@@ -1835,23 +1963,26 @@ function ResultsPanel({
                                 onResultViewModeChange("all");
                             }}
                         >
-                            全部展示
+                            
+                            {t("全部展示")}
                         </Button>
                         <Button size="small" type={resultViewMode === "category" ? "primary" : "text"} onClick={() => onResultViewModeChange("category")}>
-                            分类展示
+                            
+                            {t("分类展示")}
                         </Button>
                     </div>
                     <Button size="small" icon={<Plus className="size-3.5" />} onClick={resultViewMode === "category" ? () => setCreatingCategory(true) : onCreateSession}>
-                        {resultViewMode === "category" ? "新建分类" : "新建"}
+                        {resultViewMode === "category" ? t("新建分类") : t("新建")}
                     </Button>
                     <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!visibleLogs.length} onClick={toggleVisibleLogs}>
-                        {allVisibleLogsSelected ? "取消" : "全选"}
+                        {allVisibleLogsSelected ? t("取消") : t("全选")}
                     </Button>
                     <Button size="small" icon={<Download className="size-3.5" />} disabled={!selectedImages.length} onClick={() => selectedImages.forEach(onDownload)}>
-                        下载
+                        {t("下载")}
                     </Button>
                     <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
-                        删除
+                        
+                        {t("删除")}
                     </Button>
                 </div>
             </div>
@@ -1861,7 +1992,7 @@ function ResultsPanel({
                         result.status === "success" && result.image ? (
                             <ResultImageCard key={result.id} result={result} image={result.image} index={index} onCopyPrompt={onCopyPrompt} onEdit={onEdit} onDownload={onDownload} onSaveAsset={onSaveAsset} syncing={syncingImageIds.includes(result.image.id)} onSync={(image) => onSyncResult(result.id, image, index)} />
                         ) : result.status === "failed" ? (
-                            <FailedImageCard key={result.id} result={result} error={result.error || "生成失败"} onCopyPrompt={onCopyPrompt} onRetry={() => onRetry(result)} />
+                            <FailedImageCard key={result.id} result={result} error={result.error || t("生成失败")} onCopyPrompt={onCopyPrompt} onRetry={() => onRetry(result)} />
                         ) : (
                             <PendingImageCard key={result.id} result={result} now={now} onCopyPrompt={onCopyPrompt} />
                         ),
@@ -1903,11 +2034,11 @@ function ResultsPanel({
             ) : (
                 <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
                     <ImagePlus className="mb-4 size-11 text-stone-400" />
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有生成图片" />
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("还没有生成图片")} />
                 </div>
             )}
-            <Modal title="新建分类" open={creatingCategory} onCancel={() => setCreatingCategory(false)} onOk={() => void createCategory()} okText="创建" cancelText="取消" destroyOnHidden>
-                <Input value={categoryName} autoFocus placeholder="输入分类名称" onChange={(event) => setCategoryName(event.target.value)} onPressEnter={() => void createCategory()} />
+            <Modal title={t("新建分类")} open={creatingCategory} onCancel={() => setCreatingCategory(false)} onOk={() => void createCategory()} okText={t("创建")} cancelText={t("取消")} destroyOnHidden>
+                <Input value={categoryName} autoFocus placeholder={t("输入分类名称")} onChange={(event) => setCategoryName(event.target.value)} onPressEnter={() => void createCategory()} />
             </Modal>
         </div>
     );
@@ -1963,19 +2094,19 @@ function CategoryCard({
                         ))}
                     </>
                 ) : (
-                    <div className="flex size-full items-center justify-center text-sm text-stone-500">暂无图片</div>
+                    <div className="flex size-full items-center justify-center text-sm text-stone-500">{t("暂无图片")}</div>
                 )}
             </div>
             <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-3 pt-10 text-white">
                 {editing ? <Input value={name} autoFocus onChange={(event) => setName(event.target.value)} onPressEnter={saveName} onBlur={saveName} /> : <div className="truncate text-sm font-semibold">{category.name}</div>}
             </div>
             <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-                <Tag className="m-0 text-[10px]">{logs.length} 条</Tag>
-                <Tag className="m-0 text-[10px]">{images.length} 图</Tag>
+                <Tag className="m-0 text-[10px]">{logs.length}  {t("条")}</Tag>
+                <Tag className="m-0 text-[10px]">{images.length}  {t("图")}</Tag>
             </div>
             <div className="absolute bottom-2 right-2 z-20 flex gap-1">
-                <Button title="改名" size="small" icon={<PenLine className="size-3.5" />} onClick={() => setEditing(true)} />
-                <Button title="删除" size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => onDelete(category)} />
+                <Button title={t("改名")} size="small" icon={<PenLine className="size-3.5" />} onClick={() => setEditing(true)} />
+                <Button title={t("删除")} size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => onDelete(category)} />
             </div>
         </div>
     );
@@ -1988,12 +2119,12 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
         <div className="space-y-3">
             <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
                 <div className="px-3 py-2">
-                    <span className="font-medium text-sm">模型</span>
+                    <span className="font-medium text-sm">{t("模型")}</span>
                 </div>
                 <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
                     <ModelPicker config={config} value={model} capability="image" channelId={config.imageChannelId} workflowRef={config.imageWorkflowRef} onWorkflowChange={(value) => updateConfig("imageWorkflowRef", value)} onChange={(value, channelId) => { updateConfig("imageModel", value); if (channelId) updateConfig("imageChannelId", channelId); }} fullWidth onMissingConfig={() => openConfigDialog(false)} />
                     <div className="flex items-center justify-between gap-3 pt-1">
-                        <div className="text-xs opacity-75">接口模式</div>
+                        <div className="text-xs opacity-75">{t("接口模式")}</div>
                         <Segmented
                             size="small"
                             className="canvas-config-mode !rounded-md !p-0.5"
@@ -2038,8 +2169,8 @@ function ResultImageCard({
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
             <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-900">
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-                    {!image.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">临时URL</Tag> : null}
-                    <Tag className="m-0 text-[10px]" color="blue">新生成</Tag>
+                    {!image.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">{t("临时URL")}</Tag> : null}
+                    <Tag className="m-0 text-[10px]" color="blue">{t("新生成")}</Tag>
                 </div>
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
                 <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
@@ -2054,7 +2185,7 @@ function ResultImageCard({
                     <span>{formatDuration(image.durationMs)}</span>
                 </div>
                 <div className="flex shrink-0 gap-1">
-                    <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={image.storageKey?.startsWith("server:")} onClick={() => onSync(image)} />
+                    <Button size="small" title={t("同步到云端存储")} icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={image.storageKey?.startsWith("server:")} onClick={() => onSync(image)} />
                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)} />
                     <Button size="small" icon={<PenLine className="size-3.5" />} onClick={() => void onEdit(image, index)} />
                     <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(image, index)} />
@@ -2077,7 +2208,7 @@ function PendingImageCard({ result, now, onCopyPrompt }: { result: GenerationRes
                 />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-stone-500 dark:text-stone-400">
                     <LoaderCircle className="size-6 animate-spin" />
-                    <span>生成中</span>
+                    <span>{t("生成中")}</span>
                     <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-stone-600 shadow-sm dark:bg-stone-950/70 dark:text-stone-300">{formatDuration(Math.max(0, now - result.createdAt))}</span>
                 </div>
             </div>
@@ -2094,7 +2225,7 @@ function FailedImageCard({ result, error, onCopyPrompt, onRetry }: { result: Gen
             <div className="relative flex aspect-[4/3] flex-col items-center justify-center gap-3 p-5 text-center">
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
                 <AlertCircle className="size-7 text-red-500" />
-                <div className="text-sm font-medium text-red-600 dark:text-red-300">生成失败</div>
+                <div className="text-sm font-medium text-red-600 dark:text-red-300">{t("生成失败")}</div>
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
                     {error}
                 </Typography.Paragraph>
@@ -2102,13 +2233,15 @@ function FailedImageCard({ result, error, onCopyPrompt, onRetry }: { result: Gen
             <TaskInfo result={result} error={error} onCopyPrompt={onCopyPrompt} />
             <div className="flex justify-end gap-2 border-t border-red-200 p-3 dark:border-red-950">
                 <Button size="small" onClick={() => setDetailOpen(true)}>
-                    详情
+                    
+                    {t("详情")}
                 </Button>
                 <Button size="small" danger onClick={onRetry}>
-                    重试
+                    
+                    {t("重试")}
                 </Button>
             </div>
-            <Modal title="失败详情" open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
+            <Modal title={t("失败详情")} open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
                 <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{detail}</pre>
             </Modal>
         </div>
@@ -2124,17 +2257,19 @@ function TaskInfo({ result, error, onCopyPrompt }: { result: GenerationResult; e
                 <div className={`${expanded ? "" : "line-clamp-2"} whitespace-pre-wrap text-stone-700 dark:text-stone-200`}>{result.prompt}</div>
                 <div className="mt-2 flex justify-end gap-1">
                     <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => void onCopyPrompt(result.prompt)}>
-                        复制
+                        
+                        {t("复制")}
                     </Button>
                     <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => setExpanded((value) => !value)}>
-                        {expanded ? "收起" : "展开"}
+                        {expanded ? t("收起") : t("展开")}
                     </Button>
                 </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
                 {result.workflowName ? (
                     <Tag className="m-0" color="cyan">
-                        工作流 {result.workflowName}
+                        
+                        {t("工作流")} {result.workflowName}
                     </Tag>
                 ) : null}
                 <Tag className="m-0">{formatLogTime(result.createdAt)}</Tag>
@@ -2142,7 +2277,7 @@ function TaskInfo({ result, error, onCopyPrompt }: { result: GenerationResult; e
                 <Tag className="m-0">{result.config.apiMode === "chat" ? "Chat" : result.config.apiMode === "responses" ? "Responses" : "Images"}</Tag>
                 <Tag className="m-0">{result.config.size || "auto"}</Tag>
                 <Tag className="m-0">{result.config.quality || "auto"}</Tag>
-                {result.config.apiMode !== "chat" && result.config.streamImages ? <Tag className="m-0">流式 {result.config.streamPartialImages || "1"}</Tag> : null}
+                {result.config.apiMode !== "chat" && result.config.streamImages ? <Tag className="m-0">{t("流式")} {result.config.streamPartialImages || "1"}</Tag> : null}
                 {result.durationMs ? <Tag className="m-0">{formatDuration(result.durationMs)}</Tag> : null}
             </div>
             {error ? <div className="rounded-md bg-red-100 px-2 py-1.5 text-red-600 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
@@ -2228,18 +2363,18 @@ function HistoryLogCard({
                     {selected ? <Button size="small" danger type="text" icon={<Trash2 className="size-3.5" />} onClick={onDelete} /> : null}
                 </div>
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-                    {firstImage && !firstImage.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">临时URL</Tag> : null}
+                    {firstImage && !firstImage.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">{t("临时URL")}</Tag> : null}
                     <Tag className="m-0 text-[10px]" color={log.status === "生成中" ? "processing" : log.failCount ? "red" : "blue"}>
-                        {log.status === "生成中" ? "生成中" : log.failCount ? `失败 ${log.failCount}` : "成功"}
+                        {log.status === "生成中" ? t("生成中") : log.failCount ? `${t("失败")} ${log.failCount}` : t("成功")}
                     </Tag>
-                    <Tag className="m-0 text-[10px]">{log.imageCount} 张</Tag>
+                    <Tag className="m-0 text-[10px]">{log.imageCount}  {t("张")}</Tag>
                 </div>
                 {firstImage ? (
                     <Image src={firstImage.dataUrl} alt={`历史结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
                 ) : (
                     <div className="flex size-full flex-col items-center justify-center gap-2 p-5 text-center text-sm text-red-500">
                         <AlertCircle className="size-7" />
-                        <span>{log.errors[0] || "没有可显示的图片"}</span>
+                        <span>{log.errors[0] || t("没有可显示的图片")}</span>
                     </div>
                 )}
                 {displayImages.length > 1 ? (
@@ -2255,10 +2390,11 @@ function HistoryLogCard({
                 <div className={`${expanded ? "" : "line-clamp-2"} whitespace-pre-wrap text-stone-700 dark:text-stone-200`}>{log.prompt}</div>
                 <div className="flex items-center justify-end gap-1">
                     <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => closeThen(() => void onCopyPrompt(log.prompt))}>
-                        复制
+                        
+                        {t("复制")}
                     </Button>
                     <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => closeThen(() => setExpanded((value) => !value))}>
-                        {expanded ? "收起" : "展开"}
+                        {expanded ? t("收起") : t("展开")}
                     </Button>
                 </div>
                 <div className="flex flex-wrap gap-1">
@@ -2269,11 +2405,12 @@ function HistoryLogCard({
                             </Tag>
                         ))
                     ) : (
-                        <Tag className="m-0 text-[10px]">未分类</Tag>
+                        <Tag className="m-0 text-[10px]">{t("未分类")}</Tag>
                     )}
                     {log.workflowName ? (
                         <Tag className="m-0 text-[10px]" color="cyan">
-                            工作流 {log.workflowName}
+                            
+                            {t("工作流")} {log.workflowName}
                         </Tag>
                     ) : null}
                     <Tag className="m-0 text-[10px]">{formatLogTime(log.createdAt)}</Tag>
@@ -2281,14 +2418,15 @@ function HistoryLogCard({
                     <Tag className="m-0 text-[10px]">{log.config.apiMode === "chat" ? "Chat" : log.config.apiMode === "responses" ? "Responses" : "Images"}</Tag>
                     <Tag className="m-0 text-[10px]">{log.config.size || "auto"}</Tag>
                     <Tag className="m-0 text-[10px]">{log.config.quality || "auto"}</Tag>
-                    {log.config.apiMode !== "chat" && log.config.streamImages ? <Tag className="m-0 text-[10px]">流式 {log.config.streamPartialImages || "1"}</Tag> : null}
+                    {log.config.apiMode !== "chat" && log.config.streamImages ? <Tag className="m-0 text-[10px]">{t("流式")} {log.config.streamPartialImages || "1"}</Tag> : null}
                     <Tag className="m-0 text-[10px]">{formatDuration(log.durationMs)}</Tag>
                 </div>
                 {log.errors[0] ? (
                     <div className="flex items-start justify-between gap-2 rounded-md bg-red-100 px-2 py-1 text-red-600 dark:bg-red-950/40 dark:text-red-300">
                         <span className="line-clamp-2 min-w-0">{log.errors[0]}</span>
                         <Button size="small" type="text" className="!h-auto !p-0 text-xs" onClick={() => setDetailOpen(true)}>
-                            详情
+                            
+                            {t("详情")}
                         </Button>
                     </div>
                 ) : null}
@@ -2296,16 +2434,19 @@ function HistoryLogCard({
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-t border-stone-200 px-2.5 py-2 dark:border-stone-800">
                 <div ref={categoryMenuRef} className="relative flex flex-wrap gap-1 2xl:w-full 2xl:flex-nowrap 2xl:[&>.ant-btn]:!gap-1 2xl:[&>.ant-btn]:!px-1">
                     <Button size="small" onClick={() => closeThen(onPreview)}>
-                        载入
+                        
+                        {t("载入")}
                     </Button>
                     <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={() => closeThen(onRetry)}>
-                        重试
+                        
+                        {t("重试")}
                     </Button>
                     <Button size="small" icon={<Brush className="size-3.5" />} onClick={() => closeThen(() => onMaskEdit(firstImage))}>
-                        局部重绘
+                        {t("局部重绘")}
                     </Button>
                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => setCategoryOpen((value) => !value)}>
-                        分类
+                        
+                        {t("分类")}
                     </Button>
                     {categoryOpen ? (
                         <div className="absolute bottom-full left-0 z-20 mb-2 w-56 rounded-lg border border-stone-200 bg-background p-2 shadow-xl dark:border-stone-800 dark:bg-stone-950">
@@ -2316,29 +2457,30 @@ function HistoryLogCard({
                                         <span className="truncate">{category.name}</span>
                                     </label>
                                 ))}
-                                {!categories.length ? <div className="px-2 py-3 text-center text-xs text-stone-500">暂无分类</div> : null}
+                                {!categories.length ? <div className="px-2 py-3 text-center text-xs text-stone-500">{t("暂无分类")}</div> : null}
                             </div>
                             <div className="mt-2 flex gap-1 border-t border-stone-200 pt-2 dark:border-stone-800">
-                                <Input size="small" value={categoryName} placeholder="新分类" onChange={(event) => setCategoryName(event.target.value)} onPressEnter={() => void createCategory()} />
+                                <Input size="small" value={categoryName} placeholder={t("新分类")} onChange={(event) => setCategoryName(event.target.value)} onPressEnter={() => void createCategory()} />
                                 <Button size="small" icon={<Plus className="size-3.5" />} onClick={() => void createCategory()} />
                             </div>
                             <Button size="small" type="link" className="!mt-1 !h-auto !p-0 text-xs" onClick={() => closeThen(onClearCategories)}>
-                                移至未分类
+                                
+                                {t("移至未分类")}
                             </Button>
                         </div>
                     ) : null}
                 </div>
                 {firstImage ? (
                     <div className="flex shrink-0 gap-1">
-                        <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={firstImage.storageKey?.startsWith("server:")} onClick={() => closeThen(() => onSync(firstImage))} />
+                        <Button size="small" title={t("同步到云端存储")} icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={firstImage.storageKey?.startsWith("server:")} onClick={() => closeThen(() => onSync(firstImage))} />
                         <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => closeThen(() => void onSaveAsset(firstImage, index))} />
                         <Button size="small" icon={<PenLine className="size-3.5" />} onClick={() => closeThen(() => void onEdit(firstImage, index))} />
                         <Button size="small" icon={<Download className="size-3.5" />} onClick={() => closeThen(() => onDownload(firstImage, index))} />
                     </div>
                 ) : null}
             </div>
-            <Modal title="失败详情" open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
-                <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{log.errorDetails?.[0] || log.errors[0] || "没有详情"}</pre>
+            <Modal title={t("失败详情")} open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
+                <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{log.errorDetails?.[0] || log.errors[0] || t("没有详情")}</pre>
             </Modal>
         </div>
     );
@@ -2654,7 +2796,7 @@ function imageLogFromTask(log: GenerationLog, task: CanvasImageTask): Generation
     const startedAt = parseImageTaskTime(task.started_at ?? task.startedAt ?? task.created_at ?? task.createdAt) || log.createdAt;
     const durationMs = Date.now() - startedAt;
     if (isFailedImageTask(task)) {
-        const message = task.error?.message || task.error_detail || "图片生成失败";
+        const message = task.error?.message || task.error_detail || t("图片生成失败");
         return { ...log, task, status: "失败", durationMs, failCount: 1, errors: [message], errorDetails: [task.error_detail || message], lastPolledAt: Date.now() };
     }
     if (isCompletedImageTask(task)) {
@@ -2679,7 +2821,7 @@ function parseImageTaskTime(value: unknown) {
 }
 
 function errorMessage(error: unknown) {
-    return error instanceof Error ? error.message : "生成失败";
+    return error instanceof Error ? error.message : t("生成失败");
 }
 
 function errorDetail(error: unknown) {
@@ -2688,7 +2830,7 @@ function errorDetail(error: unknown) {
     try {
         return JSON.stringify(error, null, 2);
     } catch {
-        return String(error || "生成失败");
+        return String(error || t("生成失败"));
     }
 }
 
@@ -2829,7 +2971,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
     return {
         id: log.id || nanoid(),
         createdAt: log.createdAt || Date.now(),
-        title: log.title || log.model || "未命名",
+        title: log.title || log.model || t("未命名"),
         prompt: log.prompt || log.title || "",
         time: log.time || new Date().toLocaleString("zh-CN", { hour12: false }),
         model: log.model || config.imageModel || "",
@@ -2931,19 +3073,6 @@ function imageExtension(value: string) {
     return "png";
 }
 
-function defaultWorkflowButtonPosition() {
-    if (typeof window === "undefined") return { x: 24, y: 320 };
-    return { x: Math.max(16, window.innerWidth - 132), y: Math.max(96, Math.round(window.innerHeight / 2)) };
-}
-
-function clampWorkflowButtonPosition(position: { x?: number; y?: number }) {
-    if (typeof window === "undefined") return { x: Number(position.x) || 24, y: Number(position.y) || 320 };
-    return {
-        x: Math.min(Math.max(12, Number(position.x) || 12), Math.max(12, window.innerWidth - 120)),
-        y: Math.min(Math.max(72, Number(position.y) || 72), Math.max(72, window.innerHeight - 64)),
-    };
-}
-
 function buildLog({
     id,
     prompt,
@@ -2994,7 +3123,7 @@ function buildLog({
     return {
         id: id || nanoid(),
         createdAt: logCreatedAt,
-        title: prompt.slice(0, 12) || "未命名",
+        title: prompt.slice(0, 12) || t("未命名"),
         prompt,
         time: time || formatLogTime(logCreatedAt),
         model,

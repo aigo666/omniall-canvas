@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Copy, FolderPlus } from "lucide-react";
 import { Button, Modal, Space, Tag } from "antd";
 
@@ -27,15 +28,18 @@ export function PromptDetailDialog({ prompt, onClose, onCopy, onSaveAsset }: { p
                                 </div>
                                 <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-800 dark:text-stone-300">{prompt.prompt}</p>
                                 <div className="mt-4 text-xs text-stone-500 dark:text-stone-400">
-                                    创建：{formatPromptDate(prompt.createdAt)} · 更新：{formatPromptDate(prompt.updatedAt)}
+                                    
+                                    {t("创建：")}{formatPromptDate(prompt.createdAt)}  {t("· 更新：")}{formatPromptDate(prompt.updatedAt)}
                                 </div>
                                 <Space wrap className="mt-5">
                                     <Button type="primary" icon={<Copy className="size-4" />} onClick={() => onCopy(prompt.prompt)}>
-                                        复制提示词
+                                        
+                                        {t("复制提示词")}
                                     </Button>
                                     {onSaveAsset ? (
                                         <Button icon={<FolderPlus className="size-4" />} onClick={() => onSaveAsset(prompt)}>
-                                            加入我的素材
+                                            
+                                            {t("加入我的素材")}
                                         </Button>
                                     ) : null}
                                 </Space>

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CanvasDirectorCapture, CanvasDirectorPanorama, CanvasDirectorVideo } from "../types";
@@ -78,7 +79,7 @@ export function CanvasDirector({
                 const captures = Array.isArray(event.data?.payload?.captures)
                     ? event.data.payload.captures
                         .filter((capture: DirectorCapturePayload): capture is { dataUrl: string; fileName?: unknown } => typeof capture?.dataUrl === "string" && capture.dataUrl.startsWith("data:image/"))
-                        .map((capture: { dataUrl: string; fileName?: unknown }, index: number) => ({ dataUrl: capture.dataUrl, fileName: typeof capture.fileName === "string" && capture.fileName.trim() ? capture.fileName.trim() : "导演台截图-" + (index + 1) + ".png" }))
+                        .map((capture: { dataUrl: string; fileName?: unknown }, index: number) => ({ dataUrl: capture.dataUrl, fileName: typeof capture.fileName === "string" && capture.fileName.trim() ? capture.fileName.trim() : t("导演台截图-") + (index + 1) + ".png" }))
                     : [];
                 if (captures.length) void onCapturesSent(nodeId, captures);
                 return;
@@ -89,7 +90,7 @@ export function CanvasDirector({
                 if (!(blob instanceof Blob) || !blob.size || !blob.type.startsWith("video/mp4")) return;
                 const fileName = typeof event.data?.payload?.fileName === "string" && event.data.payload.fileName.trim()
                     ? event.data.payload.fileName.trim()
-                    : "导演台视频.mp4";
+                    : t("导演台视频.mp4");
                 const width = Number(event.data?.payload?.width);
                 const height = Number(event.data?.payload?.height);
                 const durationSeconds = Number(event.data?.payload?.durationSeconds);
@@ -125,7 +126,7 @@ export function CanvasDirector({
 
     return (
         <div className="fixed inset-0 z-[2000]">
-            <iframe ref={iframeRef} title="3D导演台" src="/director/index.html" className="block h-full w-full border-0" />
+            <iframe ref={iframeRef} title={t("3D导演台")} src="/director/index.html" className="block h-full w-full border-0" />
         </div>
     );
 }

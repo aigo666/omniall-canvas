@@ -10,3 +10,10 @@ data/
 web/public/InfiniteCanvas-ComfyBridge*
 .DS_Store
 .idea
+desktop/dist/
+desktop/resources/web/
+desktop/resources/agent/
+desktop/node_modules/
+web/public/downloads/*.dmg
+web/public/downloads/*.exe
+web/public/downloads/*.blockmap

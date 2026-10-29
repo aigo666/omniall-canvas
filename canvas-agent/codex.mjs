@@ -1,10 +1,6 @@
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
-
-const require = createRequire(import.meta.url);
-const binary = join(dirname(require.resolve("@openai/codex/package.json")), "bin/codex.js");
+import { resolveCodexRuntime, spawnCodex } from "./codex-bin.mjs";
 
 export class CodexClient {
     pending = new Map();
@@ -14,9 +10,14 @@ export class CodexClient {
 
     constructor(emit) {
         this.emit = emit;
-        this.child = spawn(process.execPath, [binary, "app-server", "--disable", "image_generation"], {
+        this.ready = this.start(emit);
+    }
+
+    async start(emit) {
+        const runtime = await resolveCodexRuntime();
+        if (!runtime.ready) throw new Error(runtime.message || "本机未安装可用的 Codex");
+        this.child = spawnCodex(runtime, ["app-server", "--disable", "image_generation"], {
             stdio: ["pipe", "pipe", "pipe"],
-            windowsHide: true,
         });
         createInterface({ input: this.child.stdout }).on("line", (line) => {
             try {
@@ -24,7 +25,7 @@ export class CodexClient {
                 if (message.method) {
                     if (message.id !== undefined) this.approvals.add(message.id);
                     if (message.method === "serverRequest/resolved") this.approvals.delete(message.params.requestId);
-                    this.emit("rpc", message);
+                    emit("rpc", message);
                 } else {
                     const pending = this.pending.get(message.id);
                     if (!pending) return;
@@ -41,10 +42,11 @@ export class CodexClient {
         this.child.stdin.on("error", (error) => this.close(error));
         this.child.on("error", (error) => this.close(error));
         this.child.on("exit", (code) => this.close(new Error("Codex 已退出：" + code)));
-        this.ready = this.request("initialize", {
+        await this.request("initialize", {
             clientInfo: { name: "infinite-canvas", title: "Infinite Canvas", version: "0.1.0" },
             capabilities: { experimentalApi: true, requestAttestation: false },
-        }).then(() => this.write({ method: "initialized" }));
+        });
+        this.write({ method: "initialized" });
     }
 
     write(message) {
@@ -82,10 +84,10 @@ export class CodexClient {
         }
         this.pending.clear();
         this.approvals.clear();
-        if (process.platform === "win32" && this.child.pid && this.child.exitCode === null && this.child.signalCode === null) {
+        if (process.platform === "win32" && this.child?.pid && this.child.exitCode === null && this.child.signalCode === null) {
             spawn("taskkill", ["/PID", String(this.child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" })
                 .on("error", () => this.child.kill());
-        } else this.child.kill();
+        } else this.child?.kill();
         this.emit("rpc", { method: "bridge/disconnected", params: { message: error.message } });
     }
 }

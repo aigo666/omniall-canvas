@@ -1,13 +1,14 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Carousel, type GetRef } from "antd";
 import { Megaphone, X } from "lucide-react";
 
 const ANNOUNCEMENTS = [
-    <><Megaphone />TokenDance X 百亿 Token 补贴，一键登录即可接入，SD 2 Mini 低至 0.09元/秒 <a href="https://tokendance.space/" target="_blank" rel="noopener" className="underline!">查看详情</a></>,
-    <><Megaphone />无限画布现已支持 RunningHub X ComfyUI 工作流</>,
-    <><Megaphone />微信交流群现已开放 <a href="https://qr.tdeh.uk/ai" target="_blank" rel="noopener" className="underline!">扫码加入</a></>,
+    <><Megaphone />{t("TokenDance X 百亿 Token 补贴，一键登录即可接入，SD 2 Mini 低至 0.09元/秒")} <a href="https://tokendance.space/" target="_blank" rel="noopener" className="underline!">{t("查看详情")}</a></>,
+    <><Megaphone />{t("无限画布现已支持 RunningHub X ComfyUI 工作流")}</>,
+    <><Megaphone />{t("微信交流群现已开放")} <a href="https://qr.tdeh.uk/ai" target="_blank" rel="noopener" className="underline!">{t("扫码加入")}</a></>,
 ];
 const DISMISSED_KEY = "infinite-canvas:announcement-dismissed";
 
@@ -29,7 +30,7 @@ export function AnnouncementBanner() {
 
     return (
         <section
-            aria-label="站点公告"
+            aria-label={t("站点公告")}
             className="relative min-h-12 w-full shrink-0 bg-sky-100 text-foreground dark:bg-neutral-700"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
@@ -56,7 +57,7 @@ export function AnnouncementBanner() {
                 ))}
             </Carousel>
             {ANNOUNCEMENTS.length > 1 && (
-                <div aria-label="选择公告" className="group/indicators absolute bottom-px left-1/2 flex max-w-40 -translate-x-1/2">
+                <div aria-label={t("选择公告")} className="group/indicators absolute bottom-px left-1/2 flex max-w-40 -translate-x-1/2">
                     {ANNOUNCEMENTS.map((_, index) => (
                         <button
                             key={index}
@@ -77,7 +78,7 @@ export function AnnouncementBanner() {
             )}
             <button
                 type="button"
-                aria-label="关闭公告"
+                aria-label={t("关闭公告")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 hover:bg-foreground/10 sm:right-4"
                 onClick={() => {
                     setVisible(false);

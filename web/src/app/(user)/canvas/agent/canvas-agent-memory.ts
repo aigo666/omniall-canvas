@@ -1,6 +1,7 @@
 import type { CanvasAgentProtocolMessage } from "../types";
 import type { CanvasAgentToolDefinition } from "./canvas-agent-tools";
 
+import { t } from "@/i18n";
 export const MAX_AGENT_INPUT_TOKENS = 260_000;
 const MAX_RECENT_PROTOCOL_TOKENS = 64_000;
 const MAX_COMPACTED_CONTEXT_TOKENS = 16_000;
@@ -111,7 +112,7 @@ function estimateTextTokens(value: string) {
 
 function textContent(content: Extract<CanvasAgentProtocolMessage, { role: "user" | "system" }>["content"]) {
     if (typeof content === "string") return content;
-    return content.map((part) => part.type === "text" ? part.text : "[媒体引用]").join("\n");
+    return content.map((part) => part.type === "text" ? part.text : t("[媒体引用]")).join("\n");
 }
 
 function groupProtocolMessages(messages: CanvasAgentProtocolMessage[]) {

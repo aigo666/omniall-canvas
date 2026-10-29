@@ -1,0 +1,14 @@
+services:
+  app:
+    image: omniall-canvas:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omniall-canvas
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8866:3000"
+    restart: unless-stopped

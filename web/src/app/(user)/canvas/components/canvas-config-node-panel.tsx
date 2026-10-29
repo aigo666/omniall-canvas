@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import type { CSSProperties } from "react";
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Settings2, Video } from "lucide-react";
 import { Button, Segmented } from "antd";
@@ -44,7 +45,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
     return (
         <div className="flex h-full w-full cursor-move flex-col px-3 pb-3 pt-7 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="shrink-0 text-sm font-semibold">生成配置</div>
+                <div className="shrink-0 text-sm font-semibold">{t("生成配置")}</div>
                 <div className="cursor-default" onMouseDown={(event) => event.stopPropagation()}>
                     <Segmented
                         size="small"
@@ -57,7 +58,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
                                 label: (
                                     <span className="inline-flex items-center gap-1">
                                         <ImageIcon className="size-3.5" />
-                                        生图
+                                        
+                                        {t("生图")}
                                     </span>
                                 ),
                             },
@@ -66,7 +68,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
                                 label: (
                                     <span className="inline-flex items-center gap-1">
                                         <MessageSquare className="size-3.5" />
-                                        文本
+                                        
+                                        {t("文本")}
                                     </span>
                                 ),
                             },
@@ -75,7 +78,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
                                 label: (
                                     <span className="inline-flex items-center gap-1">
                                         <Video className="size-3.5" />
-                                        视频
+                                        
+                                        {t("视频")}
                                     </span>
                                 ),
                             },
@@ -84,7 +88,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
                                 label: (
                                     <span className="inline-flex items-center gap-1">
                                         <Music2 className="size-3.5" />
-                                        音频
+                                        
+                                        {t("音频")}
                                     </span>
                                 ),
                             },
@@ -94,13 +99,14 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
             </div>
 
             <div className="mb-2 flex flex-wrap gap-1.5">
-                <InputChip label="提示词" value={`${inputSummary.textCount} 个`} style={chipStyle} />
-                <InputChip label="参考图" value={`${inputSummary.imageCount} 张`} style={chipStyle} />
-                <InputChip label="参考视频" value={`${inputSummary.videoCount} 个`} style={chipStyle} />
-                <InputChip label="参考音频" value={`${inputSummary.audioCount} 个`} style={chipStyle} />
+                <InputChip label={t("提示词")} value={`${inputSummary.textCount} 个`} style={chipStyle} />
+                <InputChip label={t("参考图")} value={`${inputSummary.imageCount} 张`} style={chipStyle} />
+                <InputChip label={t("参考视频")} value={`${inputSummary.videoCount} 个`} style={chipStyle} />
+                <InputChip label={t("参考音频")} value={`${inputSummary.audioCount} 个`} style={chipStyle} />
                 <button type="button" className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-[11px]" style={chipStyle} onMouseDown={(event) => event.stopPropagation()} onClick={onComposerToggle}>
                     <Settings2 className="size-3.5" />
-                    组装提示词
+                    
+                    {t("组装提示词")}
                 </button>
             </div>
 
@@ -127,10 +133,10 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, videoFram
             >
                 <span className="inline-flex items-center gap-1.5">
                     <span className="inline-flex items-center gap-1">
-                        {node.metadata?.workflowRef ? "工作流" : <><CreditSymbol />{credits.toLocaleString()}</>}
+                        {node.metadata?.workflowRef ? t("工作流") : <><CreditSymbol />{credits.toLocaleString()}</>}
                     </span>
                     {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
-                    <span>开始生成</span>
+                    <span>{t("开始生成")}</span>
                 </span>
             </Button>
         </div>

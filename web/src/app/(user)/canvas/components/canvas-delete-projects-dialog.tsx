@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Button, Modal } from "antd";
 
 import { deleteCanvasProjects } from "@/services/api/canvas-tasks";
@@ -23,20 +24,21 @@ export function CanvasDeleteProjectsDialog() {
 
     return (
         <Modal
-            title="删除画布？"
+            title={t("删除画布？")}
             open={ids.length > 0}
             centered
             onCancel={() => setDeleteIds([])}
             footer={
                 <>
-                    <Button onClick={() => setDeleteIds([])}>取消</Button>
+                    <Button onClick={() => setDeleteIds([])}>{t("取消")}</Button>
                     <Button danger type="primary" onClick={confirm}>
-                        删除
+                        
+                        {t("删除")}
                     </Button>
                 </>
             }
         >
-            <p className="text-sm text-stone-500">将删除 {ids.length} 个画布，里面的节点和连线也会一起移除。</p>
+            <p className="text-sm text-stone-500">{t("将删除")} {ids.length}  {t("个画布，里面的节点和连线也会一起移除。")}</p>
         </Modal>
     );
 }

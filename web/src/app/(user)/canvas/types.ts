@@ -208,7 +208,7 @@ export type CanvasAgentPhase =
     | "complete";
 
 export type CanvasAgentConfig = {
-    mode?: "api" | "codex";
+    mode?: "api" | "codex" | "cursor";
     codexModel?: string;
     codexEffort?: string;
     textApiMode: "chat" | "responses";
@@ -269,7 +269,8 @@ export type CanvasAgentJsonFallbackMode = "structured-json" | "prompt-json";
 export type CanvasAgentToolMode = "native" | CanvasAgentJsonFallbackMode;
 
 export type CanvasAssistantSession = {
-    provider?: "api" | "codex";
+    provider?: "api" | "codex" | "cursor";
+    cursorSessionId?: string;
     codexThreadId?: string;
     codexServiceId?: string;
     id: string;

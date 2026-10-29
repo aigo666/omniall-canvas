@@ -1,21 +1,23 @@
 "use client";
 
+import { t } from "@/i18n";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     History,
     Bot,
+    ChevronDown,
     Clapperboard,
     Copy,
     Cpu,
     Gauge,
     Group,
     Image as ImageIcon,
-    ArrowLeftRight,
     Music2,
     PanelRightClose,
     Pencil,
-    PlugZap,
     Plus,
+    Puzzle,
+    RefreshCw,
     RotateCcw,
     Settings2,
     Sparkles,
@@ -42,6 +44,7 @@ import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { createCanvasAgentState, runCanvasAgent } from "../agent/canvas-agent-runtime";
 import { useCodexAgent } from "../agent/use-codex-agent";
+import { useCursorAgent } from "../agent/use-cursor-agent";
 import type { CanvasAgentContext } from "../agent/canvas-agent-context";
 import type { CanvasAgentAction, CanvasAgentToolResult } from "../agent/canvas-agent-tools";
 import {
@@ -58,20 +61,20 @@ import {
 import { isCanvasImageNodeType } from "../utils/canvas-panorama";
 import { assistantReferenceContentFromNode, buildAllCanvasResourceReferences, type CanvasResourceReference } from "../utils/canvas-resource-references";
 import { assistantToPromptReference, CanvasAssistantComposer } from "./canvas-assistant-composer";
-import { CanvasCodexConnectView } from "./canvas-codex-connect-view";
+import { CanvasCodexPluginCard, CanvasCursorPluginCard, CODEX_PLUGIN_INSTALLED_KEY } from "./canvas-codex-plugin-card";
 import { CanvasPromptChipInput } from "./canvas-prompt-chip-input";
 
 const PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = PANEL_MOTION_MS / 1000;
 const ASSISTANT_NODE_TYPE_META = {
-    [CanvasNodeType.Image]: { Icon: ImageIcon, label: "图片" },
-    [CanvasNodeType.Panorama]: { Icon: ImageIcon, label: "全景图" },
-    [CanvasNodeType.Video]: { Icon: Video, label: "视频" },
-    [CanvasNodeType.Audio]: { Icon: Music2, label: "音频" },
-    [CanvasNodeType.Text]: { Icon: Type, label: "文本" },
-    [CanvasNodeType.Config]: { Icon: Settings2, label: "生成配置" },
-    [CanvasNodeType.Director]: { Icon: Clapperboard, label: "导演台" },
-    [CanvasNodeType.Group]: { Icon: Group, label: "组" },
+    [CanvasNodeType.Image]: { Icon: ImageIcon, get label() { return t("图片"); } },
+    [CanvasNodeType.Panorama]: { Icon: ImageIcon, get label() { return t("全景图"); } },
+    [CanvasNodeType.Video]: { Icon: Video, get label() { return t("视频"); } },
+    [CanvasNodeType.Audio]: { Icon: Music2, get label() { return t("音频"); } },
+    [CanvasNodeType.Text]: { Icon: Type, get label() { return t("文本"); } },
+    [CanvasNodeType.Config]: { Icon: Settings2, get label() { return t("生成配置"); } },
+    [CanvasNodeType.Director]: { Icon: Clapperboard, get label() { return t("导演台"); } },
+    [CanvasNodeType.Group]: { Icon: Group, get label() { return t("组"); } },
 };
 const ASSISTANT_NODE_STATUS_COLOR: Record<string, string> = {
     success: "#22c55e",
@@ -159,8 +162,8 @@ export function CanvasAssistantPanel({
     const [pendingDelete, setPendingDelete] = useState<PendingDeleteConfirmation | null>(null);
     const [codexConfirmations, setCodexConfirmations] = useState<CodexConfirmation[]>([]);
     const [initialSession] = useState(() => createSession(mode));
-    const lastSessionIds = useRef<Partial<Record<"api" | "codex", string>>>({});
-    const drafts = useRef<Partial<Record<"api" | "codex", { prompt: string; references: string[]; skills: CanvasAgentSkillSelection[] }>>>({});
+    const lastSessionIds = useRef<Partial<Record<"api" | "codex" | "cursor", string>>>({});
+    const drafts = useRef<Partial<Record<"api" | "codex" | "cursor", { prompt: string; references: string[]; skills: CanvasAgentSkillSelection[] }>>>({});
     const safeSessions = sessions.length ? sessions : [initialSession];
     const visibleSessions = safeSessions.filter((session) => (session.provider || "api") === mode);
     const rememberedId = lastSessionIds.current[mode] || activeSessionId;
@@ -229,7 +232,7 @@ export function CanvasAssistantPanel({
     const appendMessage = (sessionId: string, message: CanvasAssistantMessage) => {
         updateSession(sessionId, (session) => ({
             ...session,
-            title: session.messages.length ? session.title : message.text.slice(0, 18) || "新对话",
+            title: session.messages.length ? session.title : message.text.slice(0, 18) || t("新对话"),
             messages: [...session.messages, message],
             updatedAt: new Date().toISOString(),
         }));
@@ -277,7 +280,7 @@ export function CanvasAssistantPanel({
             return;
         }
         if (selectedSkills.length >= MAX_CANVAS_AGENT_SKILLS) {
-            appMessage.warning(`最多选择 ${MAX_CANVAS_AGENT_SKILLS} 个 Skill`);
+            appMessage.warning(t("最多选择 {MAX_CANVAS_AGENT_SKILLS} 个 Skill", { MAX_CANVAS_AGENT_SKILLS }));
             return;
         }
         setSelectedSkills([...selectedSkills, skill]);
@@ -287,18 +290,18 @@ export function CanvasAssistantPanel({
         setSelectedSkills((current) => current.filter((skill) => skill.id !== id || skill.source !== source));
     };
 
-    const executeCanvasTool = async (action: CanvasAgentAction, messageReferenceNodeIds: string[], activeSkills: CanvasAgentSkillSelection[], provider: "api" | "codex", signal: AbortSignal): Promise<CanvasAgentToolResult> => {
+    const executeCanvasTool = async (action: CanvasAgentAction, messageReferenceNodeIds: string[], activeSkills: CanvasAgentSkillSelection[], provider: "api" | "codex" | "cursor", signal: AbortSignal): Promise<CanvasAgentToolResult> => {
         signal.throwIfAborted();
         if (action.name === "read_skill_file") {
             const skillId = typeof action.arguments.skillId === "string" ? action.arguments.skillId : "";
             const filePath = typeof action.arguments.path === "string" ? action.arguments.path : "";
             const activeSkill = activeSkills.find((skill) => skill.id === skillId && skill.source === "system");
-            if (!activeSkill) return { ok: false, code: "skill_not_active", message: "只能读取当前激活的系统 Skill 文件" };
+            if (!activeSkill) return { ok: false, code: "skill_not_active", message: t("只能读取当前激活的系统 Skill 文件") };
             try {
                 const file = await fetchSystemAgentSkillFile(skillId, filePath);
                 return { ok: true, skillId, path: file.path, content: file.content };
             } catch (error) {
-                return { ok: false, code: "skill_file_not_found", message: error instanceof Error ? error.message : "Skill 文件读取失败" };
+                return { ok: false, code: "skill_file_not_found", message: error instanceof Error ? error.message : t("Skill 文件读取失败") };
             }
         }
         if (action.name !== "delete_node") return onExecuteAction(action, messageReferenceNodeIds);
@@ -307,8 +310,8 @@ export function CanvasAssistantPanel({
         let confirmed: boolean;
         if (provider === "codex") {
             confirmed = await confirmCodex(
-                `删除「${node?.title || "未命名节点"}」？`,
-                <div className="text-xs opacity-55">相关连线和任务记录将按现有逻辑清理</div>,
+                `删除「${node?.title || t("未命名节点")}」？`,
+                <div className="text-xs opacity-55">{t("相关连线和任务记录将按现有逻辑清理")}</div>,
                 signal, "确认删除", "取消", true,
             );
         } else {
@@ -316,14 +319,14 @@ export function CanvasAssistantPanel({
             signal.addEventListener("abort", cancel, { once: true });
             confirmed = await new Promise<boolean>((resolve) => {
                 pendingDeleteRef.current?.resolve(false);
-                const pending = { title: node?.title || "未命名节点", resolve };
+                const pending = { title: node?.title || t("未命名节点"), resolve };
                 pendingDeleteRef.current = pending;
                 setPendingDelete(pending);
             });
             signal.removeEventListener("abort", cancel);
         }
         signal.throwIfAborted();
-        return confirmed ? onExecuteAction(action, messageReferenceNodeIds) : { ok: false, code: "delete_cancelled", message: "用户取消删除，原节点已保留" };
+        return confirmed ? onExecuteAction(action, messageReferenceNodeIds) : { ok: false, code: "delete_cancelled", message: t("用户取消删除，原节点已保留") };
     };
 
     const confirmCodex = (title: string, content: ReactNode, signal: AbortSignal, okText = "允许一次", cancelText = "拒绝", danger = false) => new Promise<boolean>((resolve) => {
@@ -338,33 +341,47 @@ export function CanvasAssistantPanel({
         canvasId,
         onBootstrap: () => { if (mode === "api") switchMode(); else setView("chat"); },
         executeTool: async (action, signal) => {
-            if (action.name === "arrange_nodes" && !(await confirmCodex("允许 Codex 整理画布？", <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(action.arguments, null, 2)}</pre>, signal))) return { ok: false, code: "action_not_requested", message: "未允许整理画布" };
+            if (action.name === "arrange_nodes" && !(await confirmCodex("允许 Codex 整理画布？", <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(action.arguments, null, 2)}</pre>, signal))) return { ok: false, code: "action_not_requested", message: t("未允许整理画布") };
             return executeCanvasTool(action, [], [], "codex", signal);
         },
         onApproval: async ({ method, params }, signal) => {
             if (method === "mcpServer/elicitation/request") {
-                appMessage.info("Codex 工具请求了额外信息，本次请求已取消");
+                appMessage.info(t("Codex 工具请求了额外信息，本次请求已取消"));
                 return { action: "decline", content: null };
             }
             const questions = method === "item/tool/requestUserInput"
                 ? params.questions as Array<{ id: string; question: string; options?: Array<{ label: string; description?: string }> }> : null;
             const answers: Record<string, { answers: string[] }> = {};
             const accepted = await confirmCodex(
-                questions ? "Codex 需要补充信息" : "Codex 请求授权",
+                questions ? t("Codex 需要补充信息") : t("Codex 请求授权"),
                 questions ? <div className="space-y-3">{questions.map((question) => <div key={question.id}>
                     <div className="mb-1 text-sm">{question.question}</div>
                     <AutoComplete className="w-full" aria-label={question.question} options={question.options?.map((option) => ({ value: option.label, label: option.description ? `${option.label}：${option.description}` : option.label }))} onChange={(value) => { answers[question.id] = { answers: [value] }; }} />
                 </div>)}</div> : <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(params, null, 2)}</pre>,
-                signal, questions ? "提交" : "允许一次", questions ? "取消" : "拒绝",
+                signal, questions ? t("提交") : t("允许一次"), questions ? t("取消") : t("拒绝"),
             );
             return questions ? { answers: accepted ? answers : {} } : method === "item/permissions/requestApproval"
                 ? { permissions: accepted ? params.permissions || {} : {}, scope: "turn" }
                 : { decision: accepted ? "accept" : "decline" };
         },
     });
-    const switchMode = () => {
-        if (isRunning) return;
-        const next = mode === "api" ? "codex" : "api";
+    const [pluginsOpen, setPluginsOpen] = useState(false);
+    const [pluginInstalled, setPluginInstalled] = useState(() => {
+        try { return localStorage.getItem(CODEX_PLUGIN_INSTALLED_KEY) === "1"; } catch { return false; }
+    });
+    const cursor = useCursorAgent({
+        canvasBridgeReady: codex.canvasReady,
+        ensureCanvasBridge: (connection) => codex.connectBridge(connection),
+    });
+    const codexActive = mode === "codex" && pluginInstalled && (codex.status === "ready" || codex.status === "connecting");
+    useEffect(() => {
+        if (mode !== "codex" || codexActive) return;
+        const timer = window.setTimeout(() => onAgentConfigChange({ mode: "api" }), 0);
+        return () => window.clearTimeout(timer);
+    }, [mode, codexActive, onAgentConfigChange]);
+    const enterAgent = (next: "api" | "codex" | "cursor") => {
+        setPluginsOpen(false);
+        if (isRunning || mode === next) { setView("chat"); return; }
         if (activeSessionIdRef.current) lastSessionIds.current[mode] = activeSessionIdRef.current;
         drafts.current[mode] = { prompt, references: composerReferenceIds, skills: selectedSkills };
         const nextSessions = sessionsRef.current.filter((session) => (session.provider || "api") === next);
@@ -378,32 +395,45 @@ export function CanvasAssistantPanel({
         setCheckedChatIds([]);
         setDeleteChatIds([]);
     };
+    const switchMode = () => enterAgent(mode === "api" ? "codex" : "api");
+    const enterCodex = () => enterAgent("codex");
+    const enterCursor = () => enterAgent("cursor");
+    const reconnectCodex = () => {
+        void codex.connect({ endpoint: codex.connection.endpoint, token: "" }).then((ok) => { if (ok) setView("chat"); });
+    };
+    const reconnectCursor = () => { void cursor.connect(); };
+    const agentDisconnected = (mode === "cursor" && cursor.status === "error")
+        || (mode === "codex" && pluginInstalled && codex.status === "error");
+    const agentDisconnectMessage = mode === "cursor" ? cursor.error : codex.error;
+    const reconnectCurrentAgent = mode === "cursor" ? reconnectCursor : reconnectCodex;
     const codexModel = codex.models.find((item) => item.model === agentConfig.codexModel) || codex.models.find((item) => item.isDefault) || codex.models[0];
     const effortLabels: Record<string, string> = { none: "不推理", minimal: "最低", low: "低", medium: "中", high: "高", xhigh: "极高", max: "最大", ultra: "超高" };
     const codexEffort = agentConfig.codexEffort || codexModel?.defaultReasoningEffort;
-    const showCodexConnection = mode === "codex" && (view === "connect" || (view === "chat" && codex.status !== "ready"));
     useEffect(() => {
-        if (view !== "chat" || showCodexConnection) return;
+        if (view !== "chat") return;
         const frame = window.requestAnimationFrame(() => {
             const element = messageListRef.current;
             if (element) element.scrollTop = element.scrollHeight;
         });
         return () => window.cancelAnimationFrame(frame);
-    }, [messages, view, showCodexConnection]);
-    const codexControls = mode === "codex" ? (
+    }, [messages, view]);
+    const codexControls = codexActive ? (
         <>
             <Dropdown trigger={["click"]} placement="topLeft" disabled={isRunning || !codex.models.length} menu={{ selectable: true, selectedKeys: codexModel ? [codexModel.model] : [], items: codex.models.map((item) => ({ key: item.model, label: item.displayName })), onClick: ({ key }) => onAgentConfigChange({ codexModel: key, codexEffort: undefined }) }}>
-                <Button type="text" className="!h-9 !min-w-8 !shrink-0 !px-2" style={{ color: theme.node.text }} icon={<Cpu className="size-4" />} aria-label="选择 Codex 模型"><span className="hidden max-w-28 truncate @[660px]:inline">{codexModel?.displayName || "选择模型"}</span></Button>
+                <Button type="text" className="!h-9 !min-w-8 !shrink-0 !px-2" style={{ color: theme.node.text }} icon={<Cpu className="size-4" />} aria-label={t("选择 Codex 模型")}><span className="hidden max-w-28 truncate @[660px]:inline">{codexModel?.displayName || t("选择模型")}</span></Button>
             </Dropdown>
             <Dropdown trigger={["click"]} placement="topLeft" disabled={isRunning || !codexModel?.supportedReasoningEfforts.length} menu={{ selectable: true, selectedKeys: codexEffort ? [codexEffort] : [], items: codexModel?.supportedReasoningEfforts.map((item) => ({ key: item.reasoningEffort, label: effortLabels[item.reasoningEffort] || item.reasoningEffort })), onClick: ({ key }) => onAgentConfigChange({ codexEffort: key }) }}>
-                <Button type="text" className="!h-9 !min-w-8 !shrink-0 !px-2" style={{ color: theme.node.text }} icon={<Gauge className="size-4" />} aria-label="选择 Codex 推理强度"><span className="hidden @[660px]:inline">{effortLabels[codexEffort || ""] || codexEffort}</span></Button>
+                <Button type="text" className="!h-9 !min-w-8 !shrink-0 !px-2" style={{ color: theme.node.text }} icon={<Gauge className="size-4" />} aria-label={t("选择 Codex 推理强度")}><span className="hidden @[660px]:inline">{effortLabels[codexEffort || ""] || codexEffort}</span></Button>
             </Dropdown>
         </>
     ) : undefined;
+    const cursorControls = mode === "cursor" ? <span className="px-2 text-xs" style={{ color: theme.node.muted }}>Cursor</span> : undefined;
 
     const sendMessage = async (text: string, savedReferences?: CanvasAssistantReference[], skillOverride?: CanvasAgentSkillSelection[] | null, showSelectedSkills = skillOverride === undefined && selectedSkills.length > 0) => {
         if (abortRef.current) return;
-        if (mode === "codex" && codex.status !== "ready") { setView("connect"); appMessage.info("请先连接本地 Codex 服务"); return; }
+        if (mode === "cursor" && cursor.status !== "ready") { appMessage.info(t("请先点击连接")); return; }
+        if (codexActive && codex.status !== "ready") { appMessage.info(t("正在连接")); return; }
+        if (mode === "codex" && !codexActive) { appMessage.info(t("请先点击连接")); return; }
         const session = activeSession || createSession(mode);
         const activeSkills = skillOverride !== undefined ? skillOverride || [] : selectedSkills.length ? selectedSkills : session.activeSkills || [];
         let activeSkillContents: Array<{ id: string; source: CanvasAgentSkillSelection["source"]; name: string; content: string; hasFiles?: boolean }> = [];
@@ -414,7 +444,7 @@ export function CanvasAssistantPanel({
                 try {
                     await skillStore.loadSkills();
                 } catch (error) {
-                    appMessage.error(error instanceof Error ? error.message : "Skill 加载失败");
+                    appMessage.error(error instanceof Error ? error.message : t("Skill 加载失败"));
                     return;
                 }
             }
@@ -445,6 +475,32 @@ export function CanvasAssistantPanel({
         setComposerReferenceIds([]);
         setSelectedSkills([]);
         setRemovedReferenceIds(new Set(selectedNodeIds));
+
+        if (mode === "cursor") {
+            const controller = new AbortController();
+            abortRef.current = controller;
+            setIsRunning(true);
+            try {
+                updateMessage(session.id, assistantId, { status: "running", activity: "Cursor 正在处理" });
+                const prior = session.messages.filter((message) => message.text?.trim()).slice(-6).map((message) => `${message.role === "user" ? t("用户") : "Cursor"}：${message.text.trim()}`).join("\n\n");
+                const current = messageReferenceNodeIds.length ? `${text}\n\n参考节点：${messageReferenceNodeIds.join("、")}` : text;
+                const result = await cursor.chat({
+                    prompt: prior ? `${prior}\n\n用户：${current}` : current,
+                    sessionId: session.cursorSessionId,
+                    signal: controller.signal,
+                    onText: (value) => updateMessage(session.id, assistantId, { text: value }),
+                });
+                if (result.sessionId) updateSession(session.id, (current) => ({ ...current, cursorSessionId: result.sessionId, updatedAt: new Date().toISOString() }));
+                updateMessage(session.id, assistantId, { text: result.text, status: "success", activity: undefined });
+            } catch (error) {
+                if (controller.signal.aborted) updateMessage(session.id, assistantId, { status: "success", activity: undefined });
+                else updateMessage(session.id, assistantId, { text: error instanceof Error ? error.message : t("Cursor 对话失败"), status: "error", activity: undefined });
+            } finally {
+                abortRef.current = null;
+                setIsRunning(false);
+            }
+            return;
+        }
 
         const requestConfig = {
             ...effectiveConfig,
@@ -479,7 +535,7 @@ export function CanvasAssistantPanel({
                     }
                 }),
             );
-            const run = mode === "codex" ? (input: Parameters<typeof runCanvasAgent>[0]) => codex.run({
+            const run = codexActive ? (input: Parameters<typeof runCanvasAgent>[0]) => codex.run({
                 ...input, threadId: session.codexThreadId, serviceId: session.codexServiceId, model: codexModel?.model, effort: codexEffort,
                 onThread: (codexThreadId, codexServiceId) => updateSession(session.id, (current) => ({ ...current, codexThreadId, codexServiceId })),
                 onText: (text) => updateMessage(session.id, assistantId, { text }),
@@ -523,7 +579,7 @@ export function CanvasAssistantPanel({
         } catch (error) {
             const stopped = error instanceof Error && error.name === "AbortError";
             updateMessage(session.id, assistantId, {
-                text: stopped ? "已停止继续执行。已经创建的节点和已经提交的媒体任务会保留。" : error instanceof Error ? error.message : "Agent 执行失败",
+                text: stopped ? t("已停止继续执行。已经创建的节点和已经提交的媒体任务会保留。") : error instanceof Error ? error.message : t("Agent 执行失败"),
                 status: stopped ? "waiting" : "error",
                 activity: undefined,
             });
@@ -590,31 +646,46 @@ export function CanvasAssistantPanel({
                 transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: [0.22, 1, 0.36, 1] }}
                 style={{ width, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
             >
-                <button type="button" className="absolute inset-y-0 left-0 z-40 w-4 -translate-x-1/2 cursor-col-resize" onMouseDown={(event) => { event.preventDefault(); startResize(); }} aria-label="调整右侧面板宽度" />
+                <button type="button" className="absolute inset-y-0 left-0 z-40 w-4 -translate-x-1/2 cursor-col-resize" onMouseDown={(event) => { event.preventDefault(); startResize(); }} aria-label={t("调整右侧面板宽度")} />
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: theme.node.stroke }}>
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Bot className="size-4" />
-                        {view === "history" ? "历史记录" : mode === "codex" ? "Codex" : "创作 Agent"}
-                        <Tooltip title={mode === "codex" ? "切换回创作 Agent" : "切换到 Codex"}>
-                            <Button size="small" className="!h-7 !rounded-md !px-2.5 !shadow-none" style={{ font: "inherit", color: theme.node.text, background: "transparent", borderColor: theme.node.stroke }} icon={<ArrowLeftRight className="size-3.5" />} disabled={isRunning} onClick={switchMode}>{mode === "codex" ? "创作 Agent" : "Codex"}</Button>
-                        </Tooltip>
+                        {view === "history" ? t("历史记录") : (
+                            <Dropdown
+                                trigger={["click"]}
+                                menu={{
+                                    selectable: true,
+                                    selectedKeys: [mode],
+                                    items: [
+                                        { key: "api", label: "OmniAgent" },
+                                        { key: "codex", label: "Codex Agent", disabled: codex.status !== "ready" },
+                                        { key: "cursor", label: "Cursor", disabled: cursor.status !== "ready" },
+                                    ],
+                                    onClick: ({ key }) => enterAgent(key === "codex" ? "codex" : key === "cursor" ? "cursor" : "api"),
+                                }}
+                            >
+                                <button type="button" className="inline-flex items-center gap-1" style={{ color: theme.node.text }} aria-label={t("切换 Agent")}>
+                                    {mode === "cursor" ? "Cursor" : mode === "codex" ? "Codex Agent" : "OmniAgent"}
+                                    <ChevronDown className="size-3.5" style={{ color: theme.node.muted }} />
+                                </button>
+                            </Dropdown>
+                        )}
                     </div>
                     <div className="flex items-center gap-1">
-                        {mode === "codex" ? <Tooltip title="连接教程"><Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<PlugZap className="size-4" />} aria-label="连接教程" disabled={isRunning} onClick={() => { setView("connect"); messageListRef.current?.scrollTo({ top: 0 }); }} /></Tooltip> : null}
                         {view === "history" ? (
                             <>
-                                <Tooltip title="删除选中">
+                                <Tooltip title={t("删除选中")}>
                                     <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<Trash2 className="size-4" />} disabled={!checkedChatIds.length} onClick={() => setDeleteChatIds(checkedChatIds)} />
                                 </Tooltip>
-                                <Tooltip title="删除全部">
+                                <Tooltip title={t("删除全部")}>
                                     <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<X className="size-4" />} disabled={!historySessions.length} onClick={() => setDeleteChatIds(historySessions.map((session) => session.id))} />
                                 </Tooltip>
                             </>
                         ) : null}
-                        <Tooltip title={view === "history" ? "返回对话" : "历史记录"}>
+                        <Tooltip title={view === "history" ? t("返回对话") : t("历史记录")}>
                             <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<History className="size-4" />} onClick={() => setView(view === "history" ? "chat" : "history")} />
                         </Tooltip>
-                        <Tooltip title="新对话">
+                        <Tooltip title={t("新对话")}>
                             <Button
                                 type="text"
                                 shape="circle"
@@ -628,17 +699,27 @@ export function CanvasAssistantPanel({
                                 }}
                             />
                         </Tooltip>
-                        <Tooltip title="Agent 设置">
+                        <Tooltip title={t("插件")}>
+                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<Puzzle className="size-4" />} aria-label={t("插件")} aria-pressed={pluginsOpen} onClick={() => setPluginsOpen((open) => !open)} />
+                        </Tooltip>
+                        <Tooltip title={t("Agent 设置")}>
                             <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<Settings2 className="size-4" />} onClick={() => setSettingsOpen(true)} />
                         </Tooltip>
-                        <Tooltip title="收起对话">
+                        <Tooltip title={t("收起对话")}>
                             <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<PanelRightClose className="size-4" />} onClick={collapse} />
                         </Tooltip>
                     </div>
                 </div>
 
+                {pluginsOpen ? (
+                    <div className="border-b px-4 py-2" style={{ borderColor: theme.node.stroke }}>
+                        <CanvasCodexPluginCard connecting={codex.status === "connecting"} connected={codex.status === "ready"} phase={codex.phase} error={codex.error} onInstalledChange={setPluginInstalled} onStart={enterCodex} onReconnect={reconnectCodex} onConnect={reconnectCodex} />
+                        <CanvasCursorPluginCard connecting={cursor.status === "connecting"} connected={cursor.status === "ready"} phase={cursor.phase} error={cursor.error} onStart={enterCursor} onReconnect={reconnectCursor} onConnect={reconnectCursor} />
+                    </div>
+                ) : null}
+
                 <div ref={messageListRef} className="thin-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                    {showCodexConnection ? <CanvasCodexConnectView agent={codex} onChat={() => setView("chat")} /> : view === "history" ? (
+                    {view === "history" ? (
                         <AssistantHistory
                             sessions={historySessions}
                             activeSession={activeSession}
@@ -653,32 +734,56 @@ export function CanvasAssistantPanel({
                             onDelete={(id) => setDeleteChatIds([id])}
                         />
                     ) : messages.length ? (
-                        <AssistantMessages messages={messages} nodeById={nodeById} onFocusNode={onFocusNode} onRetry={retryMessage} codexMode={mode === "codex"} />
+                        <AssistantMessages
+                            messages={messages}
+                            nodeById={nodeById}
+                            onFocusNode={onFocusNode}
+                            onRetry={retryMessage}
+                            onReconnect={agentDisconnected || mode === "cursor" || mode === "codex" ? reconnectCurrentAgent : undefined}
+                            reconnecting={mode === "cursor" ? cursor.status === "connecting" : codex.status === "connecting"}
+                            codexMode={codexActive}
+                            cursorMode={mode === "cursor"}
+                        />
                     ) : (
                         <div className="flex h-full flex-col items-center justify-center px-8 text-center">
                             <div className="grid size-12 place-items-center rounded-2xl" style={{ background: theme.node.fill }}>
                                 <Sparkles className="size-5" />
                             </div>
-                            <div className="mt-4 text-base font-medium">从一个想法开始</div>
-                            <div className="mt-2 max-w-[260px] text-sm leading-6 opacity-55">描述故事、宣传片或现有素材，Agent 会与你沟通并直接操作当前画布</div>
+                            <div className="mt-4 text-base font-medium">{t("从一个想法开始")}</div>
+                            <div className="mt-2 max-w-[260px] text-sm leading-6 opacity-55">{t("描述故事、宣传片或现有素材，Agent 会与你沟通并直接操作当前画布")}</div>
                         </div>
                     )}
                 </div>
 
-                {(mode === "api" ? pendingDelete : codexConfirmations.length) ? (
+                {(codexActive ? codexConfirmations.length : pendingDelete) ? (
                     <div className="thin-scrollbar max-h-[50%] shrink-0 space-y-2 overflow-y-auto pb-2">
-                        {mode === "api" && pendingDelete ? <AssistantPanelCard title={`删除「${pendingDelete.title}」？`} actions={[
-                            { label: "取消", onClick: () => settleDeleteConfirmation(false) },
-                            { label: "确认删除", danger: true, onClick: () => settleDeleteConfirmation(true) },
-                        ]}><div className="text-xs opacity-55">相关连线和任务记录将按现有逻辑清理</div></AssistantPanelCard> : null}
-                        {mode === "codex" ? codexConfirmations.map((confirmation) => <AssistantPanelCard key={confirmation.id} title={confirmation.title} actions={confirmation.actions}>{confirmation.content}</AssistantPanelCard>) : null}
+                        {!codexActive && pendingDelete ? <AssistantPanelCard title={`删除「${pendingDelete.title}」？`} actions={[
+                            { label: t("取消"), onClick: () => settleDeleteConfirmation(false) },
+                            { label: t("确认删除"), danger: true, onClick: () => settleDeleteConfirmation(true) },
+                        ]}><div className="text-xs opacity-55">{t("相关连线和任务记录将按现有逻辑清理")}</div></AssistantPanelCard> : null}
+                        {codexActive ? codexConfirmations.map((confirmation) => <AssistantPanelCard key={confirmation.id} title={confirmation.title} actions={confirmation.actions}>{confirmation.content}</AssistantPanelCard>) : null}
                     </div>
                 ) : null}
-                {view === "chat" && !showCodexConnection ? (
+                {view === "chat" && agentDisconnected ? (
+                    <div className="mx-4 mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs leading-5" style={{ background: theme.toolbar.itemHover, color: theme.node.text }}>
+                        <span className="min-w-0 flex-1">{agentDisconnectMessage || t("连接已断开，请重新连接后再继续创作")}</span>
+                        <Button
+                            size="small"
+                            type="primary"
+                            loading={mode === "cursor" ? cursor.status === "connecting" : codex.status === "connecting"}
+                            icon={<RefreshCw className="size-3.5" />}
+                            onClick={reconnectCurrentAgent}
+                        >
+                            {t("重新连接")}
+                        </Button>
+                    </div>
+                ) : null}
+                {view === "chat" ? (
                     <CanvasAssistantComposer
                         prompt={prompt}
                         isRunning={isRunning}
-                        codexControls={codexControls}
+                        showPromptLibrary
+                        codexControls={codexControls || cursorControls}
                         references={composerReferences}
                         availableReferences={resourceReferences}
                         pendingReferences={pendingReferences}
@@ -703,17 +808,17 @@ export function CanvasAssistantPanel({
                 ) : null}
 
                 <Modal
-                    title="Agent 设置"
+                    title={t("Agent 设置")}
                     open={settingsOpen}
                     centered
                     width={520}
                     onCancel={() => setSettingsOpen(false)}
-                    footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>}
+                    footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>{t("完成")}</Button>}
                 >
-                    {mode !== "codex" ? <div className="flex items-center justify-between gap-6 py-2">
+                    {!codexActive && mode !== "cursor" ? <div className="flex items-center justify-between gap-6 py-2">
                         <div className="min-w-0">
-                            <div className="text-sm font-medium">文本接口</div>
-                            <div className="mt-1 text-xs leading-5 opacity-55">选择使用 Chat Completions 或 Responses 接口</div>
+                            <div className="text-sm font-medium">{t("文本接口")}</div>
+                            <div className="mt-1 text-xs leading-5 opacity-55">{t("选择使用 Chat Completions 或 Responses 接口")}</div>
                         </div>
                         <Segmented
                             value={agentConfig.textApiMode}
@@ -721,30 +826,30 @@ export function CanvasAssistantPanel({
                             onChange={(textApiMode) => onAgentConfigChange({ textApiMode: textApiMode as CanvasAgentConfig["textApiMode"] })}
                         />
                     </div> : null}
-                    {mode !== "codex" ? <div className="flex items-center justify-between gap-6 py-2">
+                    {!codexActive && mode !== "cursor" ? <div className="flex items-center justify-between gap-6 py-2">
                         <div className="min-w-0">
-                            <div className="text-sm font-medium">流式响应</div>
-                            <div className="mt-1 text-xs leading-5 opacity-55">开启后以流式读取文本模型回复</div>
+                            <div className="text-sm font-medium">{t("流式响应")}</div>
+                            <div className="mt-1 text-xs leading-5 opacity-55">{t("开启后以流式读取文本模型回复")}</div>
                         </div>
                         <Switch checked={agentConfig.textStreaming === true} onChange={(textStreaming) => onAgentConfigChange({ textStreaming })} />
                     </div> : null}
                     <div className="flex items-center justify-between gap-6 py-2">
                         <div className="min-w-0">
-                            <div className="text-sm font-medium">自动生成图片/视频/音频</div>
-                            <div className="mt-1 text-xs leading-5 opacity-55">开启后，Agent 可直接提交图片/视频/音频生成，无需再次确认</div>
+                            <div className="text-sm font-medium">{t("自动生成图片/视频/音频")}</div>
+                            <div className="mt-1 text-xs leading-5 opacity-55">{t("开启后，Agent 可直接提交图片/视频/音频生成，无需再次确认")}</div>
                         </div>
                         <Switch checked={agentConfig.autoGenerateMedia} onChange={(autoGenerateMedia) => onAgentConfigChange({ autoGenerateMedia })} />
                     </div>
                 </Modal>
 
                 <Modal
-                    title="删除对话记录？"
+                    title={t("删除对话记录？")}
                     open={deleteChatIds.length > 0}
                     centered
                     onCancel={() => setDeleteChatIds([])}
                     footer={
                         <>
-                            <Button onClick={() => setDeleteChatIds([])}>取消</Button>
+                            <Button onClick={() => setDeleteChatIds([])}>{t("取消")}</Button>
                             <Button
                                 danger
                                 type="primary"
@@ -752,15 +857,16 @@ export function CanvasAssistantPanel({
                                     try {
                                         await removeSessions(deleteChatIds);
                                         setDeleteChatIds((current) => current === deleteChatIds ? [] : current);
-                                    } catch (error) { appMessage.error(error instanceof Error ? error.message : "删除会话失败"); }
+                                    } catch (error) { appMessage.error(error instanceof Error ? error.message : t("删除会话失败")); }
                                 }}
                             >
-                                删除
+                                
+                                {t("删除")}
                             </Button>
                         </>
                     }
                 >
-                    <p className="text-sm opacity-60">将删除 {deleteChatIds.length} 条对话记录，此操作不可撤销</p>
+                    <p className="text-sm opacity-60">{t("将删除")} {deleteChatIds.length}  {t("条对话记录，此操作不可撤销")}</p>
                 </Modal>
             </motion.aside>
         </motion.div>
@@ -818,7 +924,20 @@ function AssistantMarkdown({ children, components }: { children: string; compone
     );
 }
 
-function AssistantMessages({ messages, nodeById, onFocusNode, onRetry, codexMode }: { messages: CanvasAssistantMessage[]; nodeById: ReadonlyMap<string, CanvasNodeData>; onFocusNode: (nodeId: string) => void; onRetry: (message: CanvasAssistantMessage) => void; codexMode?: boolean }) {
+function isAgentConnectionErrorText(text: string) {
+    return /连接已断开|请先连接|未连接|本地 Agent|画布未能连接|重新连接|尚未登录|MCP 未写入|Token|本地服务/.test(text);
+}
+
+function AssistantMessages({ messages, nodeById, onFocusNode, onRetry, onReconnect, reconnecting, codexMode, cursorMode }: {
+    messages: CanvasAssistantMessage[];
+    nodeById: ReadonlyMap<string, CanvasNodeData>;
+    onFocusNode: (nodeId: string) => void;
+    onRetry: (message: CanvasAssistantMessage) => void;
+    onReconnect?: () => void;
+    reconnecting?: boolean;
+    codexMode?: boolean;
+    cursorMode?: boolean;
+}) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const copyText = useCopyText();
     const markdownComponents = useMemo<Components>(() => ({
@@ -835,7 +954,7 @@ function AssistantMessages({ messages, nodeById, onFocusNode, onRetry, codexMode
                                 {hasImage ? <img src={canvasNode.metadata?.content} alt={canvasNode.title || typeLabel} className="size-full object-cover" /> : <Icon className="size-5 opacity-60" />}
                             </span>
                             <span className="min-w-0 flex-1 space-y-0.5">
-                                <span className="block truncate text-sm font-medium leading-snug">{canvasNode.title || `${typeLabel}节点`}</span>
+                                <span className="block truncate text-sm font-medium leading-snug">{canvasNode.title || t("{typeLabel}节点", { typeLabel })}</span>
                                 <span className="block truncate text-xs leading-snug opacity-50">{canvasNode.type === CanvasNodeType.Text ? canvasNode.metadata?.content || canvasNode.metadata?.prompt || "" : typeLabel}</span>
                             </span>
                             {canvasNode.metadata?.status && canvasNode.metadata.status !== "idle" ? <span className="size-1.5 shrink-0 rounded-full" style={{ background: ASSISTANT_NODE_STATUS_COLOR[canvasNode.metadata.status] || "transparent" }} /> : null}
@@ -854,6 +973,7 @@ function AssistantMessages({ messages, nodeById, onFocusNode, onRetry, codexMode
                 const running = message.status === "thinking" || message.status === "running";
                 const showSkills = message.skillsSelected ?? Boolean(message.skills?.length && !sameSkillSelections(message.skills, previousUserSkills));
                 if (message.role === "user") previousUserSkills = message.skills || [];
+                const showReconnect = Boolean(onReconnect && message.role === "assistant" && message.status === "error" && isAgentConnectionErrorText(message.text || ""));
                 return (
                     <div key={message.id} className={cn("flex flex-col gap-2", message.role === "user" ? "items-end" : "items-start")}>
                         {message.text ? (
@@ -870,17 +990,24 @@ function AssistantMessages({ messages, nodeById, onFocusNode, onRetry, codexMode
                                 {message.role === "assistant" ? (
                                     <div className="mb-1 flex items-center gap-1.5 text-xs opacity-60">
                                         <Bot className="size-3.5" />
-                                        {codexMode ? "Codex" : "Agent"}
+                                        {cursorMode ? "Cursor" : codexMode ? "Codex Agent" : "OmniAgent"}
                                     </div>
                                 ) : null}
                                 {message.role === "assistant" ? <AssistantMarkdown components={markdownComponents}>{message.text}</AssistantMarkdown> : <UserMessageContent message={message} showSkills={showSkills} />}
+                                {showReconnect ? (
+                                    <div className="mt-2">
+                                        <Button size="small" type="primary" loading={reconnecting} icon={<RefreshCw className="size-3.5" />} onClick={onReconnect}>
+                                            {t("重新连接")}
+                                        </Button>
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
-                        {running ? <ImageGenerationPending compact label={message.activity || "正在执行"} className="w-[250px] rounded-2xl border" /> : null}
+                        {running ? <ImageGenerationPending compact label={message.activity || t("正在执行")} className="w-[250px] rounded-2xl border" /> : null}
                         {!running && message.text ? (
                             <div className="flex gap-1">
-                                <Button shape="circle" size="small" style={{ borderColor: theme.node.stroke }} icon={<Copy className="size-3.5" />} onClick={() => copyText(message.text, "消息已复制")} title="复制" />
-                                {message.role === "assistant" ? <Button shape="circle" size="small" style={{ borderColor: theme.node.stroke }} icon={<RotateCcw className="size-3.5" />} onClick={() => onRetry(message)} title="重试" /> : null}
+                                <Button shape="circle" size="small" style={{ borderColor: theme.node.stroke }} icon={<Copy className="size-3.5" />} onClick={() => copyText(message.text, t("消息已复制"))} title={t("复制")} />
+                                {message.role === "assistant" ? <Button shape="circle" size="small" style={{ borderColor: theme.node.stroke }} icon={<RotateCcw className="size-3.5" />} onClick={() => onRetry(message)} title={t("重试")} /> : null}
                             </div>
                         ) : null}
                     </div>
@@ -934,10 +1061,10 @@ function AssistantHistory({
                                 <span className="block truncate">{session.title}</span>
                             </button>
                         )}
-                        <span className="block text-xs opacity-50">{session.messages.length} 条消息</span>
+                        <span className="block text-xs opacity-50">{session.messages.length}  {t("条消息")}</span>
                     </div>
-                    <Button type="text" shape="circle" size="small" className="opacity-0 transition group-hover:opacity-100" icon={<Pencil className="size-3.5" />} onClick={() => setEditingId(session.id)} title="重命名" />
-                    <Button type="text" shape="circle" size="small" className="opacity-0 transition group-hover:opacity-100" icon={<Trash2 className="size-3.5" />} onClick={() => onDelete(session.id)} title="删除" />
+                    <Button type="text" shape="circle" size="small" className="opacity-0 transition group-hover:opacity-100" icon={<Pencil className="size-3.5" />} onClick={() => setEditingId(session.id)} title={t("重命名")} />
+                    <Button type="text" shape="circle" size="small" className="opacity-0 transition group-hover:opacity-100" icon={<Trash2 className="size-3.5" />} onClick={() => onDelete(session.id)} title={t("删除")} />
                 </div>
             ))}
         </div>
@@ -960,12 +1087,12 @@ function nodeToReference(node: CanvasNodeData, resource: CanvasResourceReference
     return content ? { id: node.id, type: node.type, title: node.title, label: resource.label, ...content } : null;
 }
 
-function createSession(provider: "api" | "codex"): CanvasAssistantSession {
+function createSession(provider: "api" | "codex" | "cursor"): CanvasAssistantSession {
     const now = new Date().toISOString();
     return {
         id: nanoid(),
         provider,
-        title: "新对话",
+        title: t("新对话"),
         messages: [],
         agentState: createCanvasAgentState(),
         protocolMessages: [],

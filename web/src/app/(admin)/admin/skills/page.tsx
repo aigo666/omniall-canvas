@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { CaretDownFilled, DeleteOutlined, EditOutlined, FileAddOutlined, FileTextOutlined, FolderAddOutlined, FolderOpenOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,18 +42,18 @@ export default function AdminSkillsPage() {
         onSuccess: async (_, skill) => {
             invalidateAgentSkillCache();
             await queryClient.invalidateQueries({ queryKey: ["admin", "agent-skills"] });
-            message.success(skill.id ? "Skill 已保存" : "Skill 已新增");
+            message.success(skill.id ? t("Skill 已保存") : t("Skill 已新增"));
         },
-        onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
+        onError: (error) => message.error(error instanceof Error ? error.message : t("保存失败")),
     });
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminAgentSkill(token, id),
         onSuccess: async () => {
             invalidateAgentSkillCache();
             await queryClient.invalidateQueries({ queryKey: ["admin", "agent-skills"] });
-            message.success("Skill 已删除");
+            message.success(t("Skill 已删除"));
         },
-        onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
+        onError: (error) => message.error(error instanceof Error ? error.message : t("删除失败")),
     });
     const skills = useMemo(() => {
         const queryText = keyword.trim().toLowerCase();
@@ -101,19 +102,19 @@ export default function AdminSkillsPage() {
         const selectedEntry = skillFiles.find((item) => item.path === selectedTreePath);
         const parentPath = selectedEntry?.kind === "folder" ? selectedEntry.path : selectedTreePath === "SKILL.md" ? "" : selectedTreePath.split("/").slice(0, -1).join("/");
         modal.confirm({
-            title: kind === "folder" ? "创建文件夹" : "创建 Markdown",
-            content: <Input autoFocus placeholder={kind === "folder" ? "文件夹名称" : "文件名称"} onChange={(event) => { name = event.target.value; }} />,
-            okText: "创建",
-            cancelText: "取消",
+            title: kind === "folder" ? t("创建文件夹") : t("创建 Markdown"),
+            content: <Input autoFocus placeholder={kind === "folder" ? t("文件夹名称") : t("文件名称")} onChange={(event) => { name = event.target.value; }} />,
+            okText: t("创建"),
+            cancelText: t("取消"),
             onOk: () => {
                 const fileName = normalizeSkillEntryName(name, kind);
                 if (!fileName) {
-                    message.error("请输入有效名称");
+                    message.error(t("请输入有效名称"));
                     return Promise.reject();
                 }
                 const nextPath = [parentPath, fileName].filter(Boolean).join("/");
                 if (nextPath.toLowerCase() === "skill.md" || skillFiles.some((item) => item.path.toLowerCase() === nextPath.toLowerCase())) {
-                    message.error("同名文件或文件夹已存在");
+                    message.error(t("同名文件或文件夹已存在"));
                     return Promise.reject();
                 }
                 setSkillFiles((current) => [...current, { path: nextPath, kind, content: "", sort: nextSkillEntrySort(current, parentPath) }]);
@@ -128,20 +129,20 @@ export default function AdminSkillsPage() {
         let name = entryPath.split("/").at(-1) || entryPath;
         const parentPath = entryPath.split("/").slice(0, -1).join("/");
         modal.confirm({
-            title: kind === "folder" ? "重命名文件夹" : "重命名文件",
+            title: kind === "folder" ? t("重命名文件夹") : t("重命名文件"),
             content: <Input autoFocus defaultValue={name} onChange={(event) => { name = event.target.value; }} />,
-            okText: "确定",
-            cancelText: "取消",
+            okText: t("确定"),
+            cancelText: t("取消"),
             onOk: () => {
                 const fileName = normalizeSkillEntryName(name, kind);
                 if (!fileName) {
-                    message.error("请输入有效名称");
+                    message.error(t("请输入有效名称"));
                     return Promise.reject();
                 }
                 const nextPath = [parentPath, fileName].filter(Boolean).join("/");
                 if (nextPath === entryPath) return;
                 if (nextPath.toLowerCase() === "skill.md" || skillFiles.some((item) => !isSkillPathWithin(item.path, entryPath) && item.path.toLowerCase() === nextPath.toLowerCase())) {
-                    message.error("同名文件或文件夹已存在");
+                    message.error(t("同名文件或文件夹已存在"));
                     return Promise.reject();
                 }
                 setSkillFiles((current) => current.map((item) => isSkillPathWithin(item.path, entryPath) ? { ...item, path: replaceSkillPathPrefix(item.path, entryPath, nextPath) } : item));
@@ -154,10 +155,10 @@ export default function AdminSkillsPage() {
 
     const deleteSkillEntry = (entryPath: string, kind: AgentSkillFile["kind"]) => {
         modal.confirm({
-            title: kind === "folder" ? "删除文件夹" : "删除文件",
-            content: kind === "folder" ? `确定删除「${entryPath}」及其中全部文件吗？` : `确定删除「${entryPath}」吗？`,
-            okText: "删除",
-            cancelText: "取消",
+            title: kind === "folder" ? t("删除文件夹") : t("删除文件"),
+            content: kind === "folder" ? t("确定删除「{entryPath}」及其中全部文件吗？", { entryPath }) : t("确定删除「{entryPath}」吗？", { entryPath }),
+            okText: t("删除"),
+            cancelText: t("取消"),
             okButtonProps: { danger: true },
             onOk: () => {
                 setSkillFiles((current) => current.filter((item) => !isSkillPathWithin(item.path, entryPath)));
@@ -175,7 +176,7 @@ export default function AdminSkillsPage() {
         const occupiedPaths = new Set(skillFiles.filter((item) => !isSkillPathWithin(item.path, entryPath)).map((item) => item.path.toLowerCase()));
         const movedPaths = skillFiles.filter((item) => isSkillPathWithin(item.path, entryPath)).map((item) => replaceSkillPathPrefix(item.path, entryPath, nextPath).toLowerCase());
         if (movedPaths.some((path) => path === "skill.md" || occupiedPaths.has(path))) {
-            message.error("目标位置存在同名文件或文件夹");
+            message.error(t("目标位置存在同名文件或文件夹"));
             return;
         }
         setSkillFiles((current) => {
@@ -208,11 +209,11 @@ export default function AdminSkillsPage() {
     const saveSkill = async () => {
         const values = await form.validateFields();
         if (!rootSkillContent.trim()) {
-            message.error("请输入 SKILL.md 内容");
+            message.error(t("请输入 SKILL.md 内容"));
             return;
         }
         if (Array.from(rootSkillContent).length > AGENT_SKILL_CONTENT_MAX_LENGTH) {
-            message.error("SKILL.md 不能超过 20000 字");
+            message.error(t("SKILL.md 不能超过 20000 字"));
             return;
         }
         const oversized = skillFiles.find((item) => item.kind === "file" && Array.from(item.content).length > AGENT_SKILL_CONTENT_MAX_LENGTH);
@@ -227,34 +228,34 @@ export default function AdminSkillsPage() {
 
     const columns: ProColumns<AgentSkill>[] = [
         {
-            title: "封面",
+            title: t("封面"),
             dataIndex: "coverUrl",
             width: 72,
             render: (_, item) => <AgentSkillCover name={item.name} coverUrl={item.coverUrl} coverStorageKey={item.coverStorageKey} size={40} iconSize={18} borderColor={antToken.colorBorder} background={antToken.colorFillQuaternary} />,
         },
         {
-            title: "名称",
+            title: t("名称"),
             dataIndex: "name",
             width: 220,
             render: (_, item) => <Typography.Text strong>{item.name}</Typography.Text>,
         },
         {
-            title: "描述",
+            title: t("描述"),
             dataIndex: "description",
             ellipsis: true,
-            render: (_, item) => <Typography.Text type="secondary">{item.description || "未填写"}</Typography.Text>,
+            render: (_, item) => <Typography.Text type="secondary">{item.description || t("未填写")}</Typography.Text>,
         },
-        { title: "状态", dataIndex: "enabled", width: 88, render: (_, item) => <Tag color={item.enabled ? "success" : "default"}>{item.enabled ? "已启用" : "已停用"}</Tag> },
-        { title: "排序", dataIndex: "sort", width: 72 },
-        { title: "更新时间", dataIndex: "updatedAt", width: 190 },
+        { title: t("状态"), dataIndex: "enabled", width: 88, render: (_, item) => <Tag color={item.enabled ? "success" : "default"}>{item.enabled ? t("已启用") : t("已停用")}</Tag> },
+        { title: t("排序"), dataIndex: "sort", width: 72 },
+        { title: t("更新时间"), dataIndex: "updatedAt", width: 190 },
         {
-            title: "操作",
+            title: t("操作"),
             key: "actions",
             width: 88,
             render: (_, item) => (
                 <Space size={4}>
-                    <Tooltip title="编辑"><Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingSkill(item)} /></Tooltip>
-                    <Tooltip title="删除"><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => setDeletingSkill(item)} /></Tooltip>
+                    <Tooltip title={t("编辑")}><Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingSkill(item)} /></Tooltip>
+                    <Tooltip title={t("删除")}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => setDeletingSkill(item)} /></Tooltip>
                 </Space>
             ),
         },
@@ -267,10 +268,10 @@ export default function AdminSkillsPage() {
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="420px">
-                                <Form.Item label="关键词"><Input.Search value={keyword} allowClear enterButton={<SearchOutlined />} placeholder="搜索名称、描述或内容" onChange={(event) => setKeyword(event.target.value)} /></Form.Item>
+                                <Form.Item label={t("关键词")}><Input.Search value={keyword} allowClear enterButton={<SearchOutlined />} placeholder={t("搜索名称、描述或内容")} onChange={(event) => setKeyword(event.target.value)} /></Form.Item>
                             </Col>
                             <Col flex="none">
-                                <Form.Item><Button icon={<ReloadOutlined />} onClick={() => void query.refetch()}>刷新</Button></Form.Item>
+                                <Form.Item><Button icon={<ReloadOutlined />} onClick={() => void query.refetch()}>{t("刷新")}</Button></Form.Item>
                             </Col>
                         </Row>
                     </Form>
@@ -284,40 +285,40 @@ export default function AdminSkillsPage() {
                     defaultSize="middle"
                     tableLayout="fixed"
                     cardProps={{ variant: "borderless" }}
-                    headerTitle={<Space><Typography.Text strong>系统预设 Skill</Typography.Text><Tag>{skills.length} 条</Tag></Space>}
+                    headerTitle={<Space><Typography.Text strong>{t("系统预设 Skill")}</Typography.Text><Tag>{skills.length}  {t("条")}</Tag></Space>}
                     options={false}
                     pagination={{ defaultPageSize: 10, showSizeChanger: true }}
-                    toolBarRender={() => [<Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingSkill({ enabled: true, sort: 0 })}>新增</Button>]}
+                    toolBarRender={() => [<Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingSkill({ enabled: true, sort: 0 })}>{t("新增")}</Button>]}
                 />
             </Flex>
 
-            <Modal title={editingSkill?.id ? "编辑 Skill" : "新增 Skill"} open={Boolean(editingSkill)} width={1120} footer={null} onCancel={() => setEditingSkill(null)} destroyOnHidden>
+            <Modal title={editingSkill?.id ? t("编辑 Skill") : t("新增 Skill")} open={Boolean(editingSkill)} width={1120} footer={null} onCancel={() => setEditingSkill(null)} destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Form.Item name="coverUrl" hidden><Input /></Form.Item>
                     <Form.Item name="coverStorageKey" hidden><Input /></Form.Item>
                     <Form.Item name="content" hidden><Input /></Form.Item>
                     <div className="grid h-[min(680px,calc(100vh-180px))] gap-6 md:grid-cols-[380px_minmax(0,1fr)]">
                         <div className="flex min-h-0 flex-col pb-5">
-                            <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入 Skill 名称" }]}><Input /></Form.Item>
-                            <Form.Item name="description" label="描述"><Input.TextArea rows={3} /></Form.Item>
-                            <Form.Item label="封面图片">
+                            <Form.Item name="name" label={t("名称")} rules={[{ required: true, message: t("请输入 Skill 名称") }]}><Input /></Form.Item>
+                            <Form.Item name="description" label={t("描述")}><Input.TextArea rows={3} /></Form.Item>
+                            <Form.Item label={t("封面图片")}>
                                 <AgentSkillCoverEditor name={editingSkill?.name || "Skill"} coverUrl={editingCoverUrl} coverStorageKey={editingCoverStorageKey} size={72} iconSize={26} borderColor={antToken.colorBorder} background={antToken.colorFillQuaternary} onChange={(value) => form.setFieldsValue(value)} />
                             </Form.Item>
                             <Flex align="end" gap={12}>
-                                <Form.Item name="enabled" label="启用" valuePropName="checked" style={{ marginBottom: 0 }}><Switch /></Form.Item>
-                                <Form.Item name="sort" label="排序" style={{ marginBottom: 0 }}><InputNumber min={0} precision={0} className="!w-20" /></Form.Item>
-                                <Button type="primary" loading={saveMutation.isPending || filesQuery.isFetching} disabled={Boolean(editingSkill?.id && filesQuery.isError)} style={{ marginLeft: "auto" }} onClick={() => void saveSkill()}>保存</Button>
+                                <Form.Item name="enabled" label={t("启用")} valuePropName="checked" style={{ marginBottom: 0 }}><Switch /></Form.Item>
+                                <Form.Item name="sort" label={t("排序")} style={{ marginBottom: 0 }}><InputNumber min={0} precision={0} className="!w-20" /></Form.Item>
+                                <Button type="primary" loading={saveMutation.isPending || filesQuery.isFetching} disabled={Boolean(editingSkill?.id && filesQuery.isError)} style={{ marginLeft: "auto" }} onClick={() => void saveSkill()}>{t("保存")}</Button>
                             </Flex>
                             <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-lg border p-3" style={{ borderColor: antToken.colorBorder }}>
                                 <Flex align="center" justify="space-between">
-                                    <Typography.Text strong>目录</Typography.Text>
+                                    <Typography.Text strong>{t("目录")}</Typography.Text>
                                     <Space size={2}>
-                                        <Tooltip title="创建文件夹"><Button type="text" size="small" disabled={filesQuery.isFetching || filesQuery.isError} icon={<FolderAddOutlined />} onClick={() => createSkillEntry("folder")} /></Tooltip>
-                                        <Tooltip title="创建 Markdown"><Button type="text" size="small" disabled={filesQuery.isFetching || filesQuery.isError} icon={<FileAddOutlined />} onClick={() => createSkillEntry("file")} /></Tooltip>
+                                        <Tooltip title={t("创建文件夹")}><Button type="text" size="small" disabled={filesQuery.isFetching || filesQuery.isError} icon={<FolderAddOutlined />} onClick={() => createSkillEntry("folder")} /></Tooltip>
+                                        <Tooltip title={t("创建 Markdown")}><Button type="text" size="small" disabled={filesQuery.isFetching || filesQuery.isError} icon={<FileAddOutlined />} onClick={() => createSkillEntry("file")} /></Tooltip>
                                     </Space>
                                 </Flex>
                                 <div className="thin-scrollbar mt-2 min-h-0 flex-1 overflow-y-auto" onDropCapture={handleFolderDrop}>
-                                    {filesQuery.isFetching ? <Typography.Text type="secondary">正在加载目录…</Typography.Text> : filesQuery.isError ? <Typography.Text type="danger">目录加载失败，请关闭后重试</Typography.Text> : (
+                                    {filesQuery.isFetching ? <Typography.Text type="secondary">{t("正在加载目录…")}</Typography.Text> : filesQuery.isError ? <Typography.Text type="danger">{t("目录加载失败，请关闭后重试")}</Typography.Text> : (
                                         <ConfigProvider theme={{ components: { Tree: { indentSize: 12, switcherSize: 16 } } }}>
                                             <Tree
                                                 blockNode
@@ -333,16 +334,16 @@ export default function AdminSkillsPage() {
                                                     return (
                                                         <span className="pointer-events-none flex min-w-0 flex-1 items-center gap-1" data-skill-path={node.key} data-skill-kind={node.kind}>
                                                             {node.kind === "folder" && node.children?.length ? (
-                                                                <button type="button" aria-label={expanded ? "收起文件夹" : "展开文件夹"} aria-expanded={expanded} className="pointer-events-auto flex size-4 shrink-0 items-center justify-center" onClick={(event) => { event.stopPropagation(); setExpandedPaths((current) => current.includes(node.key) ? current.filter((path) => path !== node.key) : [...current, node.key]); }}>
+                                                                <button type="button" aria-label={expanded ? t("收起文件夹") : t("展开文件夹")} aria-expanded={expanded} className="pointer-events-auto flex size-4 shrink-0 items-center justify-center" onClick={(event) => { event.stopPropagation(); setExpandedPaths((current) => current.includes(node.key) ? current.filter((path) => path !== node.key) : [...current, node.key]); }}>
                                                                     <CaretDownFilled className={`text-[10px] transition-transform ${expanded ? "" : "-rotate-90"}`} />
                                                                 </button>
                                                             ) : null}
                                                             <span className="flex size-4 shrink-0 items-center justify-center">{movingInside ? <FolderOpenOutlined /> : node.icon}</span>
                                                             <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                                                            {movingInside ? <Typography.Text type="secondary" className="shrink-0 text-xs">移入</Typography.Text> : node.key === "SKILL.md" ? null : (
+                                                            {movingInside ? <Typography.Text type="secondary" className="shrink-0 text-xs">{t("移入")}</Typography.Text> : node.key === "SKILL.md" ? null : (
                                                                 <Space size={0} className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-                                                                    <Tooltip title="重命名"><Button type="text" size="small" icon={<EditOutlined />} onClick={() => renameSkillEntry(String(node.key), node.kind)} /></Tooltip>
-                                                                    <Tooltip title="删除"><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => deleteSkillEntry(String(node.key), node.kind)} /></Tooltip>
+                                                                    <Tooltip title={t("重命名")}><Button type="text" size="small" icon={<EditOutlined />} onClick={() => renameSkillEntry(String(node.key), node.kind)} /></Tooltip>
+                                                                    <Tooltip title={t("删除")}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => deleteSkillEntry(String(node.key), node.kind)} /></Tooltip>
                                                                 </Space>
                                                             )}
                                                         </span>
@@ -427,7 +428,7 @@ export default function AdminSkillsPage() {
                         </div>
                         <div className="flex min-h-0 flex-col pb-5">
                             <Flex align="center" justify="space-between" className="mb-2">
-                                <Typography.Text>Skill 内容</Typography.Text>
+                                <Typography.Text>{t("Skill 内容")}</Typography.Text>
                                 <Typography.Text type="secondary" className="max-w-[70%] truncate text-xs">{selectedFilePath}</Typography.Text>
                             </Flex>
                             <Input.TextArea value={selectedContent} count={{ max: AGENT_SKILL_CONTENT_MAX_LENGTH, strategy: (value) => Array.from(value).length, show: ({ count, maxLength }) => `${count} / ${maxLength}`, exceedFormatter: (value, { max }) => Array.from(value).slice(0, max).join("") }} classNames={{ root: "min-h-0 flex-1" }} styles={{ root: { height: "100%" }, textarea: { height: "100%", resize: "none" } }} onChange={(event) => setSelectedContent(event.target.value)} />
@@ -436,8 +437,9 @@ export default function AdminSkillsPage() {
                 </Form>
             </Modal>
 
-            <Modal title="删除 Skill" open={Boolean(deletingSkill)} onCancel={() => setDeletingSkill(null)} onOk={async () => { if (!deletingSkill) return; await deleteMutation.mutateAsync(deletingSkill.id); if (deletingSkill.coverStorageKey) await deleteStoredImages([deletingSkill.coverStorageKey]).catch(() => undefined); setDeletingSkill(null); }} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
-                确定删除「{deletingSkill?.name}」吗？
+            <Modal title={t("删除 Skill")} open={Boolean(deletingSkill)} onCancel={() => setDeletingSkill(null)} onOk={async () => { if (!deletingSkill) return; await deleteMutation.mutateAsync(deletingSkill.id); if (deletingSkill.coverStorageKey) await deleteStoredImages([deletingSkill.coverStorageKey]).catch(() => undefined); setDeletingSkill(null); }} okText={t("删除")} okButtonProps={{ danger: true }} cancelText={t("取消")}>
+                
+                {t("确定删除「")}{deletingSkill?.name}{t("」吗？")}
             </Modal>
         </main>
     );

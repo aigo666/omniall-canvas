@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 
@@ -55,7 +57,7 @@ export async function downloadRemoteMedia(url: string) {
         } catch {
             message = text;
         }
-        throw new Error(message || "媒体下载失败");
+        throw new Error(message || t("媒体下载失败"));
     }
     return blob;
 }
@@ -68,17 +70,17 @@ export async function uploadRemoteMediaToServer(url: string, filename: string): 
 async function uploadMediaBlobToServer(blob: Blob, filename: string, metadataUrl?: string, tokenOverride?: string): Promise<UploadedFile> {
     const config = await loadStorageConfig().catch(() => null);
     if (tokenOverride !== undefined && useUserStore.getState().token !== tokenOverride) {
-        throw new Error("登录状态已变化");
+        throw new Error(t("登录状态已变化"));
     }
     const userProvider = config?.allowUserProvider ? loadUserStorageProvider() : null;
-    if (!config || (!canUseGlobalStorage(config) && !userProvider)) throw new Error("服务端对象存储未启用");
+    if (!config || (!canUseGlobalStorage(config) && !userProvider)) throw new Error(t("服务端对象存储未启用"));
     const token = tokenOverride === undefined ? useUserStore.getState().token : tokenOverride;
     if (userProvider?.type === "webdav") {
         const directUpload = await uploadWebDAVMediaDirect(blob, filename, userProvider);
         if (directUpload) return directUpload;
     }
     if (!token) {
-        if (!userProvider) throw new Error("请先登录后再同步媒体");
+        if (!userProvider) throw new Error(t("请先登录后再同步媒体"));
         const uploaded = await uploadAnonymousStorageFile<UploadedFile>(blob, filename, toProviderPayload(userProvider));
         return cacheAnonymousMedia(uploaded, blob);
     }
@@ -87,7 +89,7 @@ async function uploadMediaBlobToServer(blob: Blob, filename: string, metadataUrl
     if (userProvider) formData.append("provider", JSON.stringify(toProviderPayload(userProvider)));
     const response = await fetch("/api/v1/files", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedFile } | null;
-    if (!response.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "媒体同步失败");
+    if (!response.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || t("媒体同步失败"));
     const meta = metadataUrl || payload.data.mimeType?.startsWith("video/") ? await readVideoMeta(metadataUrl || payload.data.url) : {};
     return { ...payload.data, bytes: payload.data.bytes || blob.size, mimeType: payload.data.mimeType || blob.type || "application/octet-stream", ...meta };
 }
@@ -200,7 +202,7 @@ async function deleteServerMedia(storageKey: string) {
         body: JSON.stringify(provider ? { provider: toProviderPayload(provider) } : {}),
     });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null;
-    if (!response.ok || payload?.code !== 0) throw new Error(payload?.msg || "删除服务端视频失败");
+    if (!response.ok || payload?.code !== 0) throw new Error(payload?.msg || t("删除服务端视频失败"));
     clearAutoSyncCache(storageKey);
 }
 

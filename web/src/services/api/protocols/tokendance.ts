@@ -2,6 +2,7 @@ import { tokenDanceAppUrl } from "@/lib/model-channel";
 import { collectHTTPURLs, firstString, normalizeDirectStatus, readDirectError, readNumber, readPath, readString, uniqueHTTPURLs } from "./shared";
 import type { DirectProtocolAdapter } from "./types";
 
+import { t } from "@/i18n";
 const TASK_SEPARATOR = "::";
 
 export function tokenDanceTaskID(protocol: string | undefined, taskId: string) {
@@ -135,7 +136,7 @@ export const tokenDanceDirectProtocol: DirectProtocolAdapter = {
     readVideoPoll(payload, pollId, model) {
         const url = videoURL(payload);
         const status = url ? "completed" : taskStatus(payload);
-        const error = status === "failed" ? taskError(payload) || "TokenDance 视频生成失败" : taskError(payload);
+        const error = status === "failed" ? taskError(payload) || t("TokenDance 视频生成失败") : taskError(payload);
         const progress = readNumber(readPath(payload, "progress")) ?? readNumber(readPath(payload, "data.0.progress"));
         return {
             id: pollId,

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { directAIProviderForProtocol, isWorkflowProtocol, type DirectAIProvider, type ModelChannelProtocol } from "@/lib/model-channel";
+import { directAIProviderForProtocol, isWorkflowProtocol, modelChannelDefaultBaseUrls, type DirectAIProvider, type ModelChannelProtocol } from "@/lib/model-channel";
 import type { WorkflowRef, WorkflowSummary } from "@/lib/workflow-channel";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
@@ -13,6 +13,8 @@ import { useUserStore } from "@/stores/use-user-store";
 export type LocalModelChannel = {
     id: string;
     protocol: ModelChannelProtocol;
+    /** Set when the user picks a protocol, so an explicit OpenAI choice is not replaced by the OmniallAI default. */
+    protocolSelected?: boolean;
     name: string;
     baseUrl: string;
     apiKey: string;
@@ -109,7 +111,7 @@ export type ModelCapabilities = Partial<Record<string, ModelCapability>>;
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: "https://api.openai.com",
+    baseUrl: "https://api.omniall.ai",
     apiKey: "",
     model: "gpt-image-2",
     imageModel: "gpt-image-2",
@@ -420,7 +422,7 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
-                const localChannels = normalizeLocalChannels(config);
+                const localChannels = prepareLocalChannels(config);
                 const modelChannels = localChannels.filter((channel) => !isWorkflowProtocol(channel.protocol));
                 const localModels = normalizeModelList(modelChannels.flatMap((channel) => channel.models));
                 return {
@@ -523,26 +525,56 @@ function normalizeVersionedBaseUrl(baseUrl: string) {
 
 export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
     const channels = Array.isArray(config.localChannels) ? config.localChannels : [];
-    const normalized: LocalModelChannel[] = channels.map((channel, index) => ({
-        id: channel.id || `local-${index + 1}`,
-        protocol: channel.protocol || "openai",
-        name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
-        baseUrl: channel.baseUrl || "",
-        apiKey: channel.apiKey || "",
-        models: Array.isArray(channel.models) ? channel.models.filter(Boolean) : [],
-        modelCapabilities: channel.modelCapabilities || {},
-        ...(isWorkflowProtocol(channel.protocol || "") ? {
-            uploadApiKey: channel.uploadApiKey || "",
-            bridgeId: channel.bridgeId || "",
-            comfyUrl: channel.comfyUrl || "",
-            workflowDir: channel.workflowDir || "",
-            workflowSummaries: Array.isArray(channel.workflowSummaries) ? channel.workflowSummaries : [],
-        } : {}),
-    }));
+    const normalized: LocalModelChannel[] = channels.map((channel, index) => {
+        const protocol = channel.protocol || "omniall";
+        return {
+            id: channel.id || `local-${index + 1}`,
+            protocol,
+            protocolSelected: channel.protocolSelected === true,
+            name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
+            baseUrl: channel.baseUrl || modelChannelDefaultBaseUrls[protocol] || "",
+            apiKey: channel.apiKey || "",
+            models: Array.isArray(channel.models) ? channel.models.filter(Boolean) : [],
+            modelCapabilities: channel.modelCapabilities || {},
+            ...(isWorkflowProtocol(protocol) ? {
+                uploadApiKey: channel.uploadApiKey || "",
+                bridgeId: channel.bridgeId || "",
+                comfyUrl: channel.comfyUrl || "",
+                workflowDir: channel.workflowDir || "",
+                workflowSummaries: Array.isArray(channel.workflowSummaries) ? channel.workflowSummaries : [],
+            } : {}),
+        };
+    });
     if (!normalized.length) {
-        normalized.push({ id: "local-default", protocol: "openai", name: "本地直连", baseUrl: config.baseUrl || defaultConfig.baseUrl, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
+        normalized.push({ id: "local-default", protocol: "omniall", name: "OmniallAI", baseUrl: modelChannelDefaultBaseUrls.omniall, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
     }
     return normalized;
+}
+
+const unsetOpenAIBases = new Set(["https://api.openai.com", "https://api.openai.com/v1"]);
+
+function isUnsetOpenAIPlaceholder(channel: LocalModelChannel) {
+    if (channel.protocolSelected) return false;
+    if (channel.apiKey.trim() || channel.models.length) return false;
+    if (channel.protocol !== "openai") return false;
+    const baseUrl = channel.baseUrl.trim().replace(/\/+$/, "");
+    return !baseUrl || unsetOpenAIBases.has(baseUrl);
+}
+
+/** Fill OmniallAI for a channel that was never configured. An explicit protocol choice is kept. */
+export function prepareLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
+    return normalizeLocalChannels(config).map((channel) => {
+        if (!isUnsetOpenAIPlaceholder(channel)) return channel;
+        return { ...channel, protocol: "omniall" as const, name: channel.name && channel.name !== "本地渠道 1" && channel.name !== "OpenAI" ? channel.name : "OmniallAI", baseUrl: modelChannelDefaultBaseUrls.omniall };
+    });
+}
+
+export function commitPreparedLocalChannels(updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void) {
+    const current = useConfigStore.getState().config;
+    const prepared = prepareLocalChannels(current);
+    if (JSON.stringify(prepared) === JSON.stringify(normalizeLocalChannels(current))) return;
+    updateConfig("localChannels", prepared);
+    if (prepared[0]?.baseUrl) updateConfig("baseUrl", prepared[0].baseUrl);
 }
 
 export function channelIdForActiveModel(config: AiConfig) {

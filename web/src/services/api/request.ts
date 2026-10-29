@@ -1,5 +1,6 @@
 import axios from "axios";
 
+import { t } from "@/i18n";
 export type ApiParams = Record<string, string | string[] | number | number[] | undefined>;
 
 type ApiResponse<T> = {
@@ -64,17 +65,17 @@ async function apiRequest<T>(config: { url: string; method: "GET" | "POST" | "DE
             validateStatus: () => true,
         });
     } catch {
-        throw new Error("接口连接失败，请确认后端服务已启动");
+        throw new Error(t("接口连接失败，请确认后端服务已启动"));
     }
 
     const result = response.data;
     if (!result || typeof result !== "object") {
-        throw new Error(response.status === 404 ? "接口不存在，请确认后端服务已启动" : "接口返回异常，请稍后重试");
+        throw new Error(response.status === 404 ? t("接口不存在，请确认后端服务已启动") : t("接口返回异常，请稍后重试"));
     }
 
     const payload = result as ApiResponse<T>;
     if (response.status < 200 || response.status >= 300 || payload.code !== 0) {
-        throw new Error(payload.msg || "请求失败");
+        throw new Error(payload.msg || t("请求失败"));
     }
 
     return payload.data;

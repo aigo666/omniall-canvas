@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Maximize2, Move } from "lucide-react";
@@ -140,8 +141,8 @@ function PanoramaSurface({ src, alt, proxyGeneratedPanorama, viewerEntry }: Pano
                 <img src={src} alt={alt} draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain" />
             ) : null}
             <div ref={containerRef} className="absolute inset-0 transition-opacity duration-200" style={{ opacity: status === "ready" ? 1 : 0 }} />
-            {status === "loading" ? <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 text-xs text-white/80">正在加载全景图...</div> : null}
-            {status === "error" ? <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-white/80">全景图加载失败</div> : null}
+            {status === "loading" ? <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 text-xs text-white/80">{t("正在加载全景图...")}</div> : null}
+            {status === "error" ? <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-white/80">{t("全景图加载失败")}</div> : null}
         </div>
     );
 }
@@ -220,8 +221,8 @@ export default function CanvasPanoramaViewer({ src, alt, proxyGeneratedPanorama 
             {onMoveStart ? (
                 <button
                     type="button"
-                    title="拖动节点"
-                    aria-label="拖动节点"
+                    title={t("拖动节点")}
+                    aria-label={t("拖动节点")}
                     className="absolute left-2 top-2 z-20 flex size-7 cursor-grab items-center justify-center rounded-md opacity-70 backdrop-blur transition-opacity hover:opacity-100 active:cursor-grabbing"
                     style={controlStyle}
                     onMouseDown={(event) => {
@@ -236,8 +237,8 @@ export default function CanvasPanoramaViewer({ src, alt, proxyGeneratedPanorama 
             {onOpen ? (
                 <button
                     type="button"
-                    title="沉浸式查看"
-                    aria-label="沉浸式查看"
+                    title={t("沉浸式查看")}
+                    aria-label={t("沉浸式查看")}
                     className="absolute bottom-2 left-2 z-20 flex size-7 items-center justify-center rounded-md opacity-70 backdrop-blur transition-opacity hover:opacity-100"
                     style={controlStyle}
                     onClick={(event) => {

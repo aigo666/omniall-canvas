@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -24,6 +25,7 @@ type CanvasPromptChipInputProps = {
     className?: string;
     style?: CSSProperties;
     placeholder?: string;
+    placeholders?: string[];
     placeholderClassName?: string;
 };
 
@@ -36,7 +38,7 @@ type PromptToken =
     | { type: "text"; value: string }
     | { type: "reference"; label: string };
 
-export function CanvasPromptChipInput({ value, references, onChange, onReferenceIdsChange, onSubmit, onPasteImage, pendingReferences, skills, onSkillRemove, readOnly, className, style, placeholder, placeholderClassName }: CanvasPromptChipInputProps) {
+export function CanvasPromptChipInput({ value, references, onChange, onReferenceIdsChange, onSubmit, onPasteImage, pendingReferences, skills, onSkillRemove, readOnly, className, style, placeholder, placeholders, placeholderClassName }: CanvasPromptChipInputProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const editorRef = useRef<HTMLDivElement>(null);
     const caretRangeRef = useRef<Range | null>(null);
@@ -45,7 +47,13 @@ export function CanvasPromptChipInput({ value, references, onChange, onReference
     const lastEmittedRef = useRef(value);
     const [mention, setMention] = useState<MentionState | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
+    const [placeholderIndex, setPlaceholderIndex] = useState(0);
+    const [placeholderVisible, setPlaceholderVisible] = useState(true);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const placeholderList = useMemo(() => {
+        const items = (placeholders?.length ? placeholders : placeholder ? [placeholder] : []).map((item) => item.trim()).filter(Boolean);
+        return items.length ? items : [];
+    }, [placeholder, placeholders]);
     const activeReferences = useMemo(() => references.filter((reference) => reference.active), [references]);
     const referenceByLabel = useMemo(() => new Map(activeReferences.map((reference) => [reference.label, reference])), [activeReferences]);
     const activeLabels = useMemo(() => Array.from(new Set(activeReferences.map((reference) => reference.label))).sort((left, right) => right.length - left.length), [activeReferences]);
@@ -159,13 +167,37 @@ export function CanvasPromptChipInput({ value, references, onChange, onReference
     };
 
     const showPlaceholder = !value.trim() && !pendingReferences?.length && !skills?.length;
+    const activePlaceholder = placeholderList[placeholderIndex] || placeholderList[0] || "";
+
+    useEffect(() => {
+        if (!showPlaceholder || placeholderList.length <= 1) {
+            setPlaceholderVisible(true);
+            setPlaceholderIndex(0);
+            return;
+        }
+        let fadeTimer = 0;
+        const timer = window.setInterval(() => {
+            setPlaceholderVisible(false);
+            fadeTimer = window.setTimeout(() => {
+                setPlaceholderIndex((current) => (current + 1) % placeholderList.length);
+                setPlaceholderVisible(true);
+            }, 220);
+        }, 5000);
+        return () => {
+            window.clearInterval(timer);
+            window.clearTimeout(fadeTimer);
+        };
+    }, [placeholderList, showPlaceholder]);
 
     return (
         <div className="relative w-full">
             <Wrench ref={skillIconRef} className="hidden size-3.5 shrink-0" aria-hidden />
-            {showPlaceholder && placeholder ? (
-                <div className={`pointer-events-none absolute left-3 top-2 text-sm leading-5 ${placeholderClassName || ""}`} style={{ color: theme.node.placeholder }}>
-                    {placeholder}
+            {showPlaceholder && activePlaceholder ? (
+                <div
+                    className={`pointer-events-none absolute left-3 top-2 text-sm leading-5 transition-all duration-200 ${placeholderClassName || ""} ${placeholderVisible ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}
+                    style={{ color: theme.node.placeholder }}
+                >
+                    {activePlaceholder}
                 </div>
             ) : null}
 
@@ -176,7 +208,7 @@ export function CanvasPromptChipInput({ value, references, onChange, onReference
                 role="textbox"
                 aria-multiline="true"
                 aria-readonly={readOnly}
-                aria-label={placeholder}
+                aria-label={activePlaceholder || placeholder}
                 className={`${className || ""} overflow-y-auto whitespace-pre-wrap break-words outline-none [&_[data-pending-reference=true]]:opacity-50`}
                 style={{ ...style, cursor: "text" }}
                 onFocus={commitPendingReferences}
@@ -292,7 +324,7 @@ export function CanvasPromptChipInput({ value, references, onChange, onReference
 
             {imagePreview ? (
                 <Image.PreviewGroup
-                    items={[{ src: imagePreview, alt: "引用图片预览" }]}
+                    items={[{ src: imagePreview, alt: t("引用图片预览") }]}
                     preview={{
                         open: true,
                         onOpenChange: (open) => {

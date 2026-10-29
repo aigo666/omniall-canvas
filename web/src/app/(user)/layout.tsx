@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { AppTopNav } from "@/components/layout/app-top-nav";
+import { AppShell } from "@/components/layout/app-shell";
 import { fetchUserConfig } from "@/services/api/user-config";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -49,10 +49,5 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         }).catch(() => { });
     }, [isReady, user]);
 
-    return (
-        <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-            <AppTopNav />
-            <div className="min-h-0 flex-1 overflow-hidden">{isProtectedPage && (!isReady || !user) ? null : children}</div>
-        </div>
-    );
+    return <AppShell>{isProtectedPage && (!isReady || !user) ? null : children}</AppShell>;
 }

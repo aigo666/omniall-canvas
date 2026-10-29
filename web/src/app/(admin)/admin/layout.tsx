@@ -1,8 +1,8 @@
 "use client";
 
+import { t, useLocale } from "@/i18n";
 import { AuditOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, PictureOutlined, SettingOutlined, ToolOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Flex, Layout, Menu, Typography, theme } from "antd";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
@@ -12,16 +12,17 @@ import { adminLayoutStyle } from "@/lib/app-theme";
 import { useUserStore } from "@/stores/use-user-store";
 
 const adminMenus = [
-    { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
-    { key: "/admin/credit-logs", icon: <TransactionOutlined />, label: "算力点日志" },
-    { key: "/admin/ai-logs", icon: <AuditOutlined />, label: "AI 日志" },
-    { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
-    { key: "/admin/skills", icon: <ToolOutlined />, label: "Skill 管理" },
-    { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
-    { key: "/admin/settings", icon: <SettingOutlined />, label: "系统设置" },
+    { key: "/admin/users", icon: <UserOutlined />, get label() { return t("用户管理"); } },
+    { key: "/admin/credit-logs", icon: <TransactionOutlined />, get label() { return t("算力点日志"); } },
+    { key: "/admin/ai-logs", icon: <AuditOutlined />, get label() { return t("AI 日志"); } },
+    { key: "/admin/prompts", icon: <FileTextOutlined />, get label() { return t("提示词管理"); } },
+    { key: "/admin/skills", icon: <ToolOutlined />, get label() { return t("Skill 管理"); } },
+    { key: "/admin/assets", icon: <PictureOutlined />, get label() { return t("素材库"); } },
+    { key: "/admin/settings", icon: <SettingOutlined />, get label() { return t("系统设置"); } },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+    useLocale();
     const { token: antToken } = theme.useToken();
     const router = useRouter();
     const pathname = usePathname();
@@ -44,7 +45,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   : pathname.startsWith("/admin/users")
                     ? "/admin/users"
                     : "";
-    const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/skills") ? "Skill 管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/ai-logs") ? "AI 日志" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
+    const pageTitle = pathname.startsWith("/admin/settings") ? t("系统设置") : pathname.startsWith("/admin/assets") ? t("素材库管理") : pathname.startsWith("/admin/skills") ? t("Skill 管理") : pathname.startsWith("/admin/prompts") ? t("提示词管理") : pathname.startsWith("/admin/ai-logs") ? t("AI 日志") : pathname.startsWith("/admin/credit-logs") ? t("算力点日志") : t("用户管理");
 
     useEffect(() => {
         if (!isReady) return;
@@ -71,29 +72,34 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <Flex align="center" gap={12} style={{ height: adminLayoutStyle.brandHeight, padding: "0 20px", borderBottom: `1px solid ${antToken.colorBorderSecondary}` }}>
                     <span aria-hidden style={{ display: "inline-block", width: 30, height: 30, background: antToken.colorText, WebkitMask: "url(/logo.svg) center / contain no-repeat", mask: "url(/logo.svg) center / contain no-repeat" }} />
                     <Typography.Text strong style={{ fontSize: 18, letterSpacing: 0 }}>
-                        无限画布
+                        
+                        {t("无限画布")}
                     </Typography.Text>
                 </Flex>
                 <Menu
                     mode="inline"
                     selectedKeys={[activeKey]}
                     style={adminLayoutStyle.menu}
+                    onClick={({ key }) => {
+                        if (typeof key === "string" && key.startsWith("/admin") && key !== pathname) {
+                            router.push(key);
+                        }
+                    }}
                     items={adminMenus.map((item) => ({
-                        ...item,
-                        label: (
-                            <Link href={item.key} style={{ color: "inherit" }}>
-                                {item.label}
-                            </Link>
-                        ),
+                        key: item.key,
+                        icon: item.icon,
+                        label: item.label,
                         style: adminLayoutStyle.menuItem,
                     }))}
                 />
                 <Flex vertical gap={8} style={{ position: "absolute", bottom: 0, insetInline: 0, padding: 12, borderTop: `1px solid ${antToken.colorBorder}`, background: antToken.colorBgContainer }}>
                     <Button block icon={<HomeOutlined />} href="/canvas" target="_blank" rel="noreferrer">
-                        前往画布
+                        
+                        {t("前往画布")}
                     </Button>
                     <Button block icon={<LogoutOutlined />} onClick={logout}>
-                        退出登录
+                        
+                        {t("退出登录")}
                     </Button>
                 </Flex>
             </Layout.Sider>

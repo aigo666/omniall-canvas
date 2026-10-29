@@ -1,27 +1,32 @@
 "use client";
+
+import { t } from "@/i18n";
 import axios from "axios";
 
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckSquare, ChevronDown, ChevronUp, ClipboardPaste, CloudUpload, Copy, Download, FolderPlus, History, LoaderCircle, Music2, PanelBottom, PanelLeft, Plus, RotateCcw, SlidersHorizontal, Sparkles, Square, Trash2, Upload, VideoIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { App, Button, Checkbox, Empty, Input, Modal, Switch, Tag, Typography } from "antd";
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CheckSquare, ChevronDown, ChevronUp, ClipboardPaste, CloudUpload, Copy, Download, FolderOpen, FolderPlus, History, LoaderCircle, Music2, PanelBottom, PanelLeft, Plus, RotateCcw, Sparkles, Square, Trash2, Upload, VideoIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { App, Button, Checkbox, Dropdown, Empty, Input, Modal, Tag, Typography } from "antd";
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { saveAs } from "file-saver";
 
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
+import { CanvasPromptPopover } from "@/app/(user)/canvas/components/canvas-prompt-popover";
+import { CanvasVideoSettingsPopover } from "@/app/(user)/canvas/components/canvas-video-settings-popover";
 import { ModelPicker } from "@/components/model-picker";
 import { useAutoDLWorkflow } from "@/hooks/use-autodl-workflow";
-import { getAutoDLCapabilities, isAutoDLConfig, normalizeAutoDLDuration } from "@/lib/autodl";
+import { getAutoDLCapabilities, isAutoDLConfig } from "@/lib/autodl";
 import { KlingV26WorkbenchPanel } from "@/app/(user)/video/components/kling-v26-workbench-panel";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
-import { VideoSettingsPanel, isKIEKlingV3Config, kieKlingOmniVariant, normalizeVideoResolutionValue, normalizeVideoSizeValue, videoResolutionOptions, videoSizeForResolution, videoSizeOptions } from "@/components/video-settings-panel";
+import { VideoSettingsPanel, isKIEKlingV3Config, kieKlingOmniVariant, normalizeVideoResolutionValue, normalizeVideoSizeValue } from "@/components/video-settings-panel";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { isMiniMaxH3Config } from "@/lib/minimax-video";
 import { ARK_SEEDANCE_REFERENCE_LIMITS, boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, seedanceReferenceLabel, seedanceVideoReferenceError, seedanceVideoReferenceHint, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
-import { COGVIDEOX3_DURATIONS, isAgnesVideoV25Model, isCogVideoX3Model, modelKey, normalizeCogVideoX3Duration, supportsVideoAudioGeneration, supportsVideoFrameReferences } from "@/lib/video-model-capabilities";
+import { isAgnesVideoV25Model, isCogVideoX3Model, modelKey, normalizeCogVideoX3Duration, supportsVideoFrameReferences } from "@/lib/video-model-capabilities";
 import { deleteStoredMedia, downloadRemoteMedia, resolveMediaUrl, uploadMediaFile, uploadRemoteMediaToServer } from "@/services/file-storage";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { WORKFLOW_VIDEO_SAVED_EVENT } from "@/components/workflows/workflow-agent-host";
 import { deleteVideoGenerationLogs, fetchVideoGenerationLogs, saveVideoGenerationLogs } from "@/services/api/generation-logs";
 import { createVideoGenerationTask, deleteVideoGenerationTask, listVideoGenerationTasks, pollVideoGenerationTaskStatus, VIDEO_POLL_INTERVAL_MS, VideoRequestError, type VideoResponse } from "@/services/api/video";
 import { stopCanvasTask } from "@/services/api/canvas-tasks";
@@ -33,8 +38,6 @@ import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { parseWorkflowRef, type WorkflowRef } from "@/lib/workflow-channel";
-
-const cogVideoX3DurationOptions = COGVIDEOX3_DURATIONS.map((value) => ({ value, label: `${value}s` }));
 
 type GeneratedVideo = {
     id: string;
@@ -142,8 +145,7 @@ export default function VideoPage() {
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
     const [running, setRunning] = useState(false);
-    const [workbenchLayout, setWorkbenchLayoutState] = useState<WorkbenchLayout>("side");
-    const [bottomSettingsCollapsed, setBottomSettingsCollapsed] = useState(true);
+    const [workbenchLayout, setWorkbenchLayoutState] = useState<WorkbenchLayout>("bottom");
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget>("general");
@@ -241,6 +243,14 @@ export default function VideoPage() {
     }, []);
 
     useEffect(() => {
+        const refresh = () => {
+            void refreshLogs();
+        };
+        window.addEventListener(WORKFLOW_VIDEO_SAVED_EVENT, refresh);
+        return () => window.removeEventListener(WORKFLOW_VIDEO_SAVED_EVENT, refresh);
+    }, []);
+
+    useEffect(() => {
         effectiveConfigRef.current = videoConfig;
     }, [videoConfig]);
 
@@ -266,13 +276,13 @@ export default function VideoPage() {
         try {
             const text = (await navigator.clipboard.readText()).trim();
             if (!text) {
-                message.error("剪切板里没有可读取的文本");
+                message.error(t("剪切板里没有可读取的文本"));
                 return;
             }
             setPrompt(text);
-            message.success("已读取剪切板文本");
+            message.success(t("已读取剪切板文本"));
         } catch {
-            message.error("剪切板里没有可读取的文本");
+            message.error(t("剪切板里没有可读取的文本"));
         }
     };
 
@@ -307,15 +317,15 @@ export default function VideoPage() {
         if (!current) return;
         const usable = selectedFiles.filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/") || isSupportedAudioFile(file)).slice(0, Math.max(0, 4 - current.references.length));
         const unsupported = selectedFiles.length - usable.length;
-        if (unsupported > 0) message.warning("已忽略超出数量或不支持的元素资源");
-        const hideLoading = usable.length ? message.loading("正在上传元素资源...", 0) : null;
+        if (unsupported > 0) message.warning(t("已忽略超出数量或不支持的元素资源"));
+        const hideLoading = usable.length ? message.loading(t("正在上传元素资源..."), 0) : null;
         try {
             const next = await Promise.all(usable.map(uploadElementReferenceFile));
             const filtered = next.filter((item): item is VideoElementReference => Boolean(item));
             updateElementReferences(elementIndex, (value) => [...value, ...filtered]);
             if (filtered.length) message.success(`已上传 ${filtered.length} 个元素资源`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "元素资源上传失败");
+            message.error(error instanceof Error ? error.message : t("元素资源上传失败"));
         } finally {
             hideLoading?.();
         }
@@ -329,7 +339,7 @@ export default function VideoPage() {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
             if (!blobs.length) {
-                message.error("剪贴板里没有可读取的图片");
+                message.error(t("剪贴板里没有可读取的图片"));
                 return;
             }
             const next = await Promise.all(blobs.slice(0, Math.max(0, 4 - current.references.length)).map(async (blob, index) => {
@@ -339,7 +349,7 @@ export default function VideoPage() {
             updateElementReferences(elementIndex, (value) => [...value, ...next]);
             message.success(`已读取 ${next.length} 个元素图片`);
         } catch {
-            message.error("剪贴板里没有可读取的图片");
+            message.error(t("剪贴板里没有可读取的图片"));
         }
     };
 
@@ -354,14 +364,14 @@ export default function VideoPage() {
     const addReferences = async (files?: FileList | null) => {
         const selectedFiles = Array.from(files || []);
         const unsupported = isKlingWorkbench ? selectedFiles.filter((file) => (!file.type.startsWith("image/") || referenceImageLimit === 0) && (!file.type.startsWith("video/") || !klingAcceptsVideoReferences)) : selectedFiles.filter((file) => !file.type.startsWith("image/") && !file.type.startsWith("video/") && !isSupportedAudioFile(file));
-        if (unsupported.length) message.warning(isKlingWorkbench ? `当前 Kling 模型仅支持${klingAcceptsVideoReferences ? "参考图和参考视频" : "参考图"}` : "已忽略不支持的参考素材，请使用图片、mp4/mov 视频或 mp3/wav 音频");
+        if (unsupported.length) message.warning(isKlingWorkbench ? `当前 Kling 模型仅支持${klingAcceptsVideoReferences ? t("参考图和参考视频") : t("参考图")}` : t("已忽略不支持的参考素材，请使用图片、mp4/mov 视频或 mp3/wav 音频"));
         const imageFiles = selectedFiles.filter((file) => file.type.startsWith("image/") && file.size <= SEEDANCE_REFERENCE_LIMITS.imageMaxBytes).slice(0, Math.max(0, referenceImageLimit - references.length));
         const videoFiles = isKlingWorkbench && !klingAcceptsVideoReferences ? [] : selectedFiles.filter((file) => file.type.startsWith("video/") && file.size <= referenceLimits.videoMaxBytes).slice(0, Math.max(0, videoReferenceLimit - videoReferences.length));
         const audioFiles = isKlingWorkbench ? [] : selectedFiles.filter((file) => isSupportedAudioFile(file) && file.size <= SEEDANCE_REFERENCE_LIMITS.audioMaxBytes).slice(0, referenceLimits.audios - audioReferences.length);
-        if (selectedFiles.some((file) => file.type.startsWith("image/") && file.size > SEEDANCE_REFERENCE_LIMITS.imageMaxBytes)) message.warning("已忽略超过 30MB 的参考图");
+        if (selectedFiles.some((file) => file.type.startsWith("image/") && file.size > SEEDANCE_REFERENCE_LIMITS.imageMaxBytes)) message.warning(t("已忽略超过 30MB 的参考图"));
         if (selectedFiles.some((file) => file.type.startsWith("video/") && file.size > referenceLimits.videoMaxBytes)) message.warning(`已忽略超过 ${referenceLimits.videoMaxBytes / 1024 / 1024}MB 的参考视频`);
-        if (selectedFiles.some((file) => isSupportedAudioFile(file) && file.size > SEEDANCE_REFERENCE_LIMITS.audioMaxBytes)) message.warning("已忽略超过 15MB 的参考音频");
-        const hideLoading = imageFiles.length ? message.loading("正在上传参考图...", 0) : null;
+        if (selectedFiles.some((file) => isSupportedAudioFile(file) && file.size > SEEDANCE_REFERENCE_LIMITS.audioMaxBytes)) message.warning(t("已忽略超过 15MB 的参考音频"));
+        const hideLoading = imageFiles.length ? message.loading(t("正在上传参考图..."), 0) : null;
         try {
             const nextReferences = await Promise.all(
                 imageFiles.map(async (file) => {
@@ -385,7 +395,7 @@ export default function VideoPage() {
             setAudioReferences((value) => [...value, ...nextAudioReferences].slice(0, referenceLimits.audios));
             if (nextReferences.length) message.success(`已上传 ${nextReferences.length} 张参考图`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "参考素材上传失败");
+            message.error(error instanceof Error ? error.message : t("参考素材上传失败"));
         } finally {
             hideLoading?.();
         }
@@ -394,20 +404,20 @@ export default function VideoPage() {
     const uploadFrameReference = async (slot: "first" | "last", files?: FileList | null) => {
         const file = Array.from(files || []).find((item) => item.type.startsWith("image/"));
         if (!file) {
-            message.error("请选择首尾帧图片");
+            message.error(t("请选择首尾帧图片"));
             return;
         }
         if (file.size > SEEDANCE_REFERENCE_LIMITS.imageMaxBytes) {
-            message.warning("已忽略超过 30MB 的首尾帧图片");
+            message.warning(t("已忽略超过 30MB 的首尾帧图片"));
             return;
         }
-        const hideLoading = message.loading(slot === "first" ? "正在上传首帧..." : "正在上传尾帧...", 0);
+        const hideLoading = message.loading(slot === "first" ? t("正在上传首帧...") : t("正在上传尾帧..."), 0);
         try {
             const image = await uploadImage(file);
             const next = { id: nanoid(), name: file.name, type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
             slot === "first" ? setFirstFrame(next) : setLastFrame(next);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "首尾帧上传失败");
+            message.error(error instanceof Error ? error.message : t("首尾帧上传失败"));
         } finally {
             hideLoading();
         }
@@ -423,7 +433,7 @@ export default function VideoPage() {
             if (file.size > SEEDANCE_REFERENCE_LIMITS.videoMaxBytes) return null;
             const video = await uploadMediaFile(file, "video-reference");
             if (video.durationMs && (video.durationMs < 3000 || video.durationMs > 8000)) {
-                message.warning("已忽略不符合时长要求的元素视频：3-8 秒");
+                message.warning(t("已忽略不符合时长要求的元素视频：3-8 秒"));
                 return null;
             }
             return { id: nanoid(), kind: "video", name: file.name, type: video.mimeType, url: video.url, storageKey: video.storageKey, bytes: video.bytes, width: video.width, height: video.height, durationMs: video.durationMs };
@@ -432,7 +442,7 @@ export default function VideoPage() {
             if (file.size > SEEDANCE_REFERENCE_LIMITS.audioMaxBytes) return null;
             const audio = await uploadMediaFile(file, "audio-reference");
             if (audio.durationMs && (audio.durationMs < 5000 || audio.durationMs > 30000)) {
-                message.warning("已忽略不符合时长要求的元素音频：5-30 秒");
+                message.warning(t("已忽略不符合时长要求的元素音频：5-30 秒"));
                 return null;
             }
             return { id: nanoid(), kind: "audio", name: file.name, type: audio.mimeType, url: audio.url, storageKey: audio.storageKey, durationMs: audio.durationMs };
@@ -442,14 +452,14 @@ export default function VideoPage() {
 
     const addReferencesFromClipboard = async () => {
         if (!referenceImageLimit) {
-            message.warning("当前 Kling 模型不支持参考图");
+            message.warning(t("当前 Kling 模型不支持参考图"));
             return;
         }
         try {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
             if (!blobs.length) {
-                message.error("剪切板里没有可读取的图片");
+                message.error(t("剪切板里没有可读取的图片"));
                 return;
             }
             const nextReferences = await Promise.all(
@@ -461,7 +471,7 @@ export default function VideoPage() {
             setReferences((value) => [...value, ...nextReferences].slice(0, referenceImageLimit));
             message.success(`已读取 ${nextReferences.length} 张参考图`);
         } catch {
-            message.error("剪切板里没有可读取的图片");
+            message.error(t("剪切板里没有可读取的图片"));
         }
     };
 
@@ -471,24 +481,24 @@ export default function VideoPage() {
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
             const blob = blobs[0];
             if (!blob) {
-                message.error("剪切板里没有可读取的图片");
+                message.error(t("剪切板里没有可读取的图片"));
                 return;
             }
             if (blob.size > SEEDANCE_REFERENCE_LIMITS.imageMaxBytes) {
-                message.warning("已忽略超过 30MB 的首尾帧图片");
+                message.warning(t("已忽略超过 30MB 的首尾帧图片"));
                 return;
             }
-            const hideLoading = message.loading(slot === "first" ? "正在读取首帧..." : "正在读取尾帧...", 0);
+            const hideLoading = message.loading(slot === "first" ? t("正在读取首帧...") : t("正在读取尾帧..."), 0);
             try {
                 const image = await uploadImage(blob);
                 const next = { id: nanoid(), name: slot === "first" ? "clipboard-first-frame.png" : "clipboard-last-frame.png", type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
                 slot === "first" ? setFirstFrame(next) : setLastFrame(next);
-                message.success(slot === "first" ? "已读取首帧" : "已读取尾帧");
+                message.success(slot === "first" ? t("已读取首帧") : t("已读取尾帧"));
             } finally {
                 hideLoading();
             }
         } catch {
-            message.error("剪切板里没有可读取的图片");
+            message.error(t("剪切板里没有可读取的图片"));
         }
     };
 
@@ -497,7 +507,7 @@ export default function VideoPage() {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("video/")).map((type) => item.getType(type))));
             if (!blobs.length) {
-                message.error("剪切板里没有可读取的视频");
+                message.error(t("剪切板里没有可读取的视频"));
                 return;
             }
             const usable = blobs.filter((blob) => blob.size <= referenceLimits.videoMaxBytes).slice(0, Math.max(0, videoReferenceLimit - videoReferences.length));
@@ -511,7 +521,7 @@ export default function VideoPage() {
             setVideoReferences((value) => [...value, ...nextVideoReferences].slice(0, videoReferenceLimit));
             message.success(`已读取 ${nextVideoReferences.length} 个参考视频`);
         } catch {
-            message.error("剪切板里没有可读取的视频");
+            message.error(t("剪切板里没有可读取的视频"));
         }
     };
 
@@ -520,11 +530,11 @@ export default function VideoPage() {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("audio/")).map((type) => item.getType(type))));
             if (!blobs.length) {
-                message.error("剪切板里没有可读取的音频");
+                message.error(t("剪切板里没有可读取的音频"));
                 return;
             }
             const usable = blobs.filter((blob) => blob.size <= SEEDANCE_REFERENCE_LIMITS.audioMaxBytes).slice(0, referenceLimits.audios - audioReferences.length);
-            if (blobs.some((blob) => blob.size > SEEDANCE_REFERENCE_LIMITS.audioMaxBytes)) message.warning("已忽略超过 15MB 的参考音频");
+            if (blobs.some((blob) => blob.size > SEEDANCE_REFERENCE_LIMITS.audioMaxBytes)) message.warning(t("已忽略超过 15MB 的参考音频"));
             const uploadedAudioReferences = await Promise.all(usable.map(async (blob, index) => {
                 const audio = await uploadMediaFile(blob, "audio-reference");
                 return { id: nanoid(), name: `clipboard-audio-${index + 1}.mp3`, type: audio.mimeType, url: audio.url, storageKey: audio.storageKey, durationMs: audio.durationMs };
@@ -533,7 +543,7 @@ export default function VideoPage() {
             setAudioReferences((value) => [...value, ...nextAudioReferences].slice(0, referenceLimits.audios));
             message.success(`已读取 ${nextAudioReferences.length} 个参考音频`);
         } catch {
-            message.error("剪切板里没有可读取的音频");
+            message.error(t("剪切板里没有可读取的音频"));
         }
     };
 
@@ -544,7 +554,7 @@ export default function VideoPage() {
         try {
             await deleteStoredImages([reference.storageKey]);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "参考图文件删除失败");
+            message.error(error instanceof Error ? error.message : t("参考图文件删除失败"));
         }
     };
 
@@ -555,7 +565,7 @@ export default function VideoPage() {
         try {
             await deleteStoredImages([reference.storageKey]);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "首尾帧文件删除失败");
+            message.error(error instanceof Error ? error.message : t("首尾帧文件删除失败"));
         }
     };
 
@@ -566,7 +576,7 @@ export default function VideoPage() {
         try {
             await deleteStoredMedia([reference.storageKey]);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "参考视频文件删除失败");
+            message.error(error instanceof Error ? error.message : t("参考视频文件删除失败"));
         }
     };
 
@@ -577,7 +587,7 @@ export default function VideoPage() {
         try {
             await deleteStoredMedia([reference.storageKey]);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "参考音频文件删除失败");
+            message.error(error instanceof Error ? error.message : t("参考音频文件删除失败"));
         }
     };
 
@@ -592,7 +602,7 @@ export default function VideoPage() {
         const text = promptText.trim();
         const currentNegativePrompt = (negativePromptText ?? configValue.videoNegativePrompt ?? negativePrompt).trim();
         if (workflowRef) {
-            if (!token) { message.error("工作流生成需要先登录"); return null; }
+            if (!token) { message.error(t("工作流生成需要先登录")); return null; }
             return { text, model: modelValue, config: { ...configValue, videoNegativePrompt: currentNegativePrompt }, references: [...referenceItems], firstFrame: firstFrameItem, lastFrame: lastFrameItem, videoReferences: [...videoReferenceItems], audioReferences: [...audioReferenceItems], taskCount: normalizeVideoCount(taskCountValue), workflowRef };
         }
         const klingV26 = isAPIMartKlingV26Config(configValue, modelValue);
@@ -602,11 +612,11 @@ export default function VideoPage() {
         const acceptsVideoReferences = omni === "reference-to-video" || omni === "transformation";
         const supportsElements = omni !== "transformation";
         if (!text && !isAutoDLConfig(configValue, modelValue)) {
-            message.error("请输入视频提示词");
+            message.error(t("请输入视频提示词"));
             return null;
         }
         if (!isAiConfigReady(configValue, modelValue)) {
-            message.warning("请先完成配置");
+            message.warning(t("请先完成配置"));
             openConfigDialog(true);
             return null;
         }
@@ -615,24 +625,24 @@ export default function VideoPage() {
             return null;
         }
         if (omni === "image-to-video" && !referenceItems.length) {
-            message.error("请添加首帧图片");
+            message.error(t("请添加首帧图片"));
             return null;
         }
         if (omni === "reference-to-video" && !referenceItems.length && !videoReferenceItems.length && !configValue.videoElementList?.some((item) => item.references?.length)) {
-            message.error("请添加参考图、参考视频或角色元素");
+            message.error(t("请添加参考图、参考视频或角色元素"));
             return null;
         }
         if (omni === "transformation" && !videoReferenceItems.length) {
-            message.error("请添加需要变换的参考视频");
+            message.error(t("请添加需要变换的参考视频"));
             return null;
         }
         if (klingV26 && boolConfig(configValue.videoGenerateAudio, false)) {
             if (configValue.videoMode !== "pro") {
-                message.error("Kling v2.6 音频生成需要 pro 模式");
+                message.error(t("Kling v2.6 音频生成需要 pro 模式"));
                 return null;
             }
             if (referenceItems.length > 1) {
-                message.error("Kling v2.6 开启音频时最多 1 张参考图");
+                message.error(t("Kling v2.6 开启音频时最多 1 张参考图"));
                 return null;
             }
         }
@@ -691,9 +701,9 @@ export default function VideoPage() {
             setLogs((value) => dedupeVideoLogs([...storedLogs, ...value.filter((log) => log.status === "停止中" || log.status === "已停止")]));
             const createdCount = nextLogs.filter((item) => item.status === "生成中").length;
             const failedCount = nextLogs.filter((item) => item.status === "失败").length;
-            if (createdCount) message.success(`已创建 ${createdCount} 个视频任务`);
-            else if (pendingLogs.some((log) => videoTaskRunsRef.current.get(log.id)?.controller.signal.aborted === false)) message.error("视频任务创建失败");
-            if (failedCount) message.warning(`${failedCount} 个视频任务创建失败`);
+            if (createdCount) message.success(t("已创建 {createdCount} 个视频任务", { createdCount }));
+            else if (pendingLogs.some((log) => videoTaskRunsRef.current.get(log.id)?.controller.signal.aborted === false)) message.error(t("视频任务创建失败"));
+            if (failedCount) message.warning(t("{failedCount} 个视频任务创建失败", { failedCount }));
         } finally {
             if (!snapshot.workflowRef || workflowSubmissionRef.current === submissionId) setRunning(false);
         }
@@ -706,14 +716,14 @@ export default function VideoPage() {
         try {
             signal.throwIfAborted();
             if (snapshot.workflowRef) {
-                if (!workflowToken) throw new Error("工作流生成需要先登录");
+                if (!workflowToken) throw new Error(t("工作流生成需要先登录"));
                 const referenceImages = [snapshot.firstFrame, ...snapshot.references, snapshot.lastFrame].filter((item): item is ReferenceImage => Boolean(item));
                 const [workflowImages, workflowVideos, workflowAudios] = await Promise.all([
                     Promise.all(referenceImages.map((item) => workflowMediaSource(item.dataUrl))),
                     Promise.all(snapshot.videoReferences.map((item) => workflowMediaSource(item.url, snapshot.workflowRef!))),
                     Promise.all(snapshot.audioReferences.map((item) => workflowMediaSource(item.url))),
                 ]);
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 onServerTask();
                 const submitted = await submitWorkflowTask(workflowToken, {
                     ref: snapshot.workflowRef,
@@ -732,23 +742,23 @@ export default function VideoPage() {
                     sourceId: pendingLog.id,
                     clientTaskId: pendingLog.task?.id,
                 });
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 const task: VideoResponse = { id: submitted.id, task_id: submitted.id, status: submitted.status, progress: submitted.progress, model: snapshot.model, workflowRef: JSON.stringify(snapshot.workflowRef), size: snapshot.config.size, seconds: snapshot.config.videoSeconds };
                 const nextLog = { ...pendingLog, taskBackend: run.backend, task, lastPolledAt: Date.now() };
                 await saveGenerationLog(nextLog, active);
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 await persistVideoLog(nextLog);
-                if (!active()) throw new Error("登录状态已变化");
+                if (!active()) throw new Error(t("登录状态已变化"));
                 setResults((value) => updateResultByLogId(value, pendingLog.id, { task, progress: task.progress, lastPolledAt: nextLog.lastPolledAt }));
                 return nextLog;
             }
             const created = await createVideoGenerationTask(snapshot.config, snapshot.text, { references: snapshot.references, firstFrame: snapshot.firstFrame, lastFrame: snapshot.lastFrame, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences }, (progress) => {
                 if (active()) setResults((value) => active() ? updateResultByLogId(value, pendingLog.id, { progress }) : value);
             }, { signal, onServerTask, clientTaskId: pendingLog.task?.id, source: "video-workbench", sourceId: pendingLog.id });
-            if (!active()) throw signal.reason || new Error("登录状态已变化");
+            if (!active()) throw signal.reason || new Error(t("登录状态已变化"));
             const nextLog = { ...pendingLog, taskBackend: run.backend, task: created.task, lastPolledAt: Date.now() };
             await saveGenerationLog(nextLog, active);
-            if (!active()) throw signal.reason || new Error("登录状态已变化");
+            if (!active()) throw signal.reason || new Error(t("登录状态已变化"));
             setResults((value) => updateResultByLogId(value, pendingLog.id, { progress: created.task.progress, task: created.task, taskLogId: nextLog.id, lastPolledAt: nextLog.lastPolledAt }));
             return nextLog;
         } catch (error) {
@@ -823,7 +833,7 @@ export default function VideoPage() {
             setLogs((value) => sortVideoLogs([nextLog, ...value.filter((item) => item.id !== logId)]));
             setResults((value) => updateResultByLogId(value, logId, { status: nextLog.status === "已停止" ? "stopped" : "stopping", durationMs: nextLog.durationMs, error: nextLog.error, errorDetail: nextLog.errorDetail }));
             if (nextLog.error) message.error(nextLog.error);
-            await saveGenerationLog(nextLog, active).catch((error) => { message.error(`${nextLog.status === "已停止" ? "任务已停止，但记录保存失败" : "停止记录保存失败"}：${errorMessage(error)}`); });
+            await saveGenerationLog(nextLog, active).catch((error) => { message.error(`${nextLog.status === "已停止" ? t("任务已停止，但记录保存失败") : t("停止记录保存失败")}：${errorMessage(error)}`); });
             if (active()) await persistVideoLog(nextLog);
         } finally {
             run.stopping = false;
@@ -872,11 +882,11 @@ export default function VideoPage() {
     };
 
     const downloadVideo = async (video: GeneratedVideo) => {
-        const hideLoading = message.loading("正在下载视频...", 0);
+        const hideLoading = message.loading(t("正在下载视频..."), 0);
         try {
             saveAs(await downloadRemoteMedia(video.url), "video.mp4");
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "视频下载失败");
+            message.error(error instanceof Error ? error.message : t("视频下载失败"));
         } finally {
             hideLoading();
         }
@@ -885,13 +895,13 @@ export default function VideoPage() {
     const syncVideo = async (video: GeneratedVideo, index = 0) => {
         if (isCloudVideo(video)) return video;
         setSyncingVideoIds((ids) => Array.from(new Set([...ids, video.id])));
-        const hideLoading = message.loading("正在同步视频到云端存储...", 0);
+        const hideLoading = message.loading(t("正在同步视频到云端存储..."), 0);
         try {
             const uploaded = await uploadRemoteMediaToServer(video.url, `video-${index + 1}.mp4`);
-            message.success("视频已同步到云端存储");
+            message.success(t("视频已同步到云端存储"));
             return { ...video, url: uploaded.url, storageKey: uploaded.storageKey, width: uploaded.width || video.width, height: uploaded.height || video.height, bytes: uploaded.bytes || video.bytes, mimeType: uploaded.mimeType || video.mimeType };
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "视频同步失败");
+            message.error(error instanceof Error ? error.message : t("视频同步失败"));
             return null;
         } finally {
             hideLoading();
@@ -917,31 +927,31 @@ export default function VideoPage() {
     const saveResultToAssets = (video: GeneratedVideo) => {
         addAsset({
             kind: "video",
-            title: "生成视频",
+            title: t("生成视频"),
             coverUrl: "",
             tags: [],
             source: "视频创作台",
             data: { url: video.url, storageKey: video.storageKey, width: video.width, height: video.height, bytes: video.bytes, mimeType: video.mimeType },
             metadata: { source: "video-page", prompt },
         });
-        message.success("已加入我的素材");
+        message.success(t("已加入我的素材"));
     };
 
     const insertPickedAsset = async (payload: InsertAssetPayload) => {
         const insertImage = async () => {
             if (!referenceImageLimit) {
-                message.warning("当前 Kling 模型不支持参考图");
+                message.warning(t("当前 Kling 模型不支持参考图"));
                 return;
             }
             if (payload.kind !== "image") {
-                message.warning("请选择图片素材");
+                message.warning(t("请选择图片素材"));
                 return;
             }
             setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: payload.mimeType || "image/*", dataUrl: payload.dataUrl, storageKey: payload.storageKey }].slice(0, referenceImageLimit));
         };
         const insertFrame = (slot: "first" | "last") => {
             if (payload.kind !== "image") {
-                message.warning("请选择图片素材");
+                message.warning(t("请选择图片素材"));
                 return;
             }
             const next = { id: nanoid(), name: payload.title, type: payload.mimeType || "image/*", dataUrl: payload.dataUrl, storageKey: payload.storageKey };
@@ -949,22 +959,22 @@ export default function VideoPage() {
         };
         const insertVideo = () => {
             if (isKlingWorkbench && !klingAcceptsVideoReferences) {
-                message.warning("当前 Kling 模型不支持参考视频");
+                message.warning(t("当前 Kling 模型不支持参考视频"));
                 return;
             }
             if (payload.kind !== "video") {
-                message.warning("请选择视频素材");
+                message.warning(t("请选择视频素材"));
                 return;
             }
             setVideoReferences((value) => [...value, { id: nanoid(), name: payload.title, type: payload.mimeType || "video/mp4", url: payload.url, storageKey: payload.storageKey, width: payload.width, height: payload.height, bytes: payload.bytes }].slice(0, videoReferenceLimit));
         };
         const insertAudio = () => {
             if (isKlingWorkbench) {
-                message.warning("当前 Kling v2.6 不支持参考音频");
+                message.warning(t("当前 Kling v2.6 不支持参考音频"));
                 return;
             }
             if (payload.kind !== "audio") {
-                message.warning("请选择音频素材");
+                message.warning(t("请选择音频素材"));
                 return;
             }
             const picked = [{ id: nanoid(), name: payload.title, type: payload.mimeType || "audio/mpeg", url: payload.url, storageKey: payload.storageKey, durationMs: payload.durationMs }];
@@ -975,7 +985,7 @@ export default function VideoPage() {
         if (assetPickerTarget === "element") {
             const next = elementReferenceFromAsset(payload);
             if (!next) {
-                message.warning("请选择图片、视频或音频素材");
+                message.warning(t("请选择图片、视频或音频素材"));
             } else {
                 updateElementReferences(elementPickerIndex, (value) => [...value, next]);
             }
@@ -1132,7 +1142,7 @@ export default function VideoPage() {
             const durationMs = Date.now() - startedAt;
             const baseLog = { ...log, task, durationMs, lastPolledAt: Date.now() };
             if (isFailedVideoTask(task)) {
-                const nextLog = { ...baseLog, status: "失败" as const, error: task.error?.message || "视频生成失败", errorDetail: errorDetail(new VideoRequestError(task.error?.message || "视频生成失败", task)) };
+                const nextLog = { ...baseLog, status: "失败" as const, error: task.error?.message || t("视频生成失败"), errorDetail: errorDetail(new VideoRequestError(task.error?.message || t("视频生成失败"), task)) };
                 await finalizeGenerationLog(nextLog, active);
                 if (!active()) return;
                 setResults((value) => updateResultByLogId(value, log.id, { status: "failed", task, error: nextLog.error, errorDetail: nextLog.errorDetail, durationMs: nextLog.durationMs, lastPolledAt: nextLog.lastPolledAt }));
@@ -1227,9 +1237,9 @@ export default function VideoPage() {
                                 referenceVideoCount={videoReferences.length}
                                 referenceVideoSection={klingAcceptsVideoReferences ? <div className="space-y-2">
                                     <div className="flex flex-wrap gap-1">
-                                        <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => void addVideoReferencesFromClipboard()}>剪贴板</Button>
-                                        <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>上传</Button>
-                                        <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => openAssetPicker("video")}>我的素材</Button>
+                                        <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => void addVideoReferencesFromClipboard()}>{t("剪贴板")}</Button>
+                                        <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>{t("上传")}</Button>
+                                        <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => openAssetPicker("video")}>{t("我的素材")}</Button>
                                     </div>
                                     <ReferenceVideoStrip references={videoReferences} maxCount={1} onRemoveReference={(id) => void removeVideoReference(id)} onMoveReference={(index, offset) => setVideoReferences((value) => moveListItem(value, index, offset))} />
                                 </div> : undefined}
@@ -1302,6 +1312,11 @@ export default function VideoPage() {
                             onMoveVideoReference={(index, offset) => setVideoReferences((value) => moveListItem(value, index, offset))}
                             onRemoveAudioReference={(id) => void removeAudioReference(id)}
                             onMoveAudioReference={(index, offset) => setAudioReferences((value) => moveListItem(value, index, offset))}
+                            onAddReferenceFiles={(files) => {
+                                const transfer = new DataTransfer();
+                                files.forEach((file) => transfer.items.add(file));
+                                void addReferences(transfer.files);
+                            }}
                             onGenerate={() => void generate()}
                         />
                         )}
@@ -1335,7 +1350,7 @@ export default function VideoPage() {
                 ) : (
                     <>
                         <ResultsPanel
-                            className="min-h-[360px] flex-1 pb-40 lg:pb-44"
+                            className="min-h-0 flex-1"
                             results={results}
                             logs={logs}
                             pendingCount={pendingCount}
@@ -1400,9 +1415,12 @@ export default function VideoPage() {
                             onMoveVideoReference={(index, offset) => setVideoReferences((value) => moveListItem(value, index, offset))}
                             onRemoveAudioReference={(id) => void removeAudioReference(id)}
                             onMoveAudioReference={(index, offset) => setAudioReferences((value) => moveListItem(value, index, offset))}
+                            onAddReferenceFiles={(files) => {
+                                const transfer = new DataTransfer();
+                                files.forEach((file) => transfer.items.add(file));
+                                void addReferences(transfer.files);
+                            }}
                             onGenerate={() => void generate()}
-                            bottomSettingsCollapsed={bottomSettingsCollapsed}
-                            setBottomSettingsCollapsed={setBottomSettingsCollapsed}
                         />
                     </>
                 )}
@@ -1451,8 +1469,9 @@ export default function VideoPage() {
             />
             <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
             <AssetPickerModal open={assetPickerOpen} defaultTab="my-assets" onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />
-            <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
-                确定删除选中的 {selectedLogIds.length} 条生成记录吗？
+            <Modal title={t("删除生成记录")} open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText={t("删除")} okButtonProps={{ danger: true }} cancelText={t("取消")}>
+                
+                {t("确定删除选中的")} {selectedLogIds.length}  {t("条生成记录吗？")}
             </Modal>
         </div>
     );
@@ -1497,9 +1516,8 @@ function WorkbenchPanel({
     onMoveVideoReference,
     onRemoveAudioReference,
     onMoveAudioReference,
+    onAddReferenceFiles,
     onGenerate,
-    bottomSettingsCollapsed = true,
-    setBottomSettingsCollapsed,
 }: {
     layout: WorkbenchLayout;
     currentLayout: WorkbenchLayout;
@@ -1539,26 +1557,16 @@ function WorkbenchPanel({
     onMoveVideoReference: (index: number, offset: number) => void;
     onRemoveAudioReference: (id: string) => void;
     onMoveAudioReference: (index: number, offset: number) => void;
+    onAddReferenceFiles?: (files: File[]) => void;
     onGenerate: () => void;
-    bottomSettingsCollapsed?: boolean;
-    setBottomSettingsCollapsed?: (value: boolean) => void;
 }) {
     const frameReferencesEnabled = Boolean(config.videoWorkflowRef) || supportsVideoFrameReferences(model, channelProtocolForConfig({ ...config, model }));
     const referenceLimits = !config.videoWorkflowRef && channelProtocolForConfig({ ...config, model, videoModel: model }) === "ark" && (modelKey(model).includes("seedance-2-5") || modelKey(model).includes("seedance2-5")) ? ARK_SEEDANCE_REFERENCE_LIMITS : SEEDANCE_REFERENCE_LIMITS;
-    const autodl = !config.videoWorkflowRef && isAutoDLConfig(config, model);
-    const { data: autodlWorkflow } = useAutoDLWorkflow(config, model);
-    const cogVideoX3 = !config.videoWorkflowRef && isCogVideoX3Model(model);
-    const audioGenerationEnabled = supportsVideoAudioGeneration(model);
-    const generateAudio = boolConfig(config.videoGenerateAudio, false);
     const klingBottomConfig = config.videoWorkflowRef ? null : resolveKlingWorkbenchConfig(config, model);
     const klingBottomVariant = klingBottomConfig?.variant || "";
     const klingBottomProvider = klingBottomConfig?.provider || "apimart";
     const klingBottom = Boolean(klingBottomConfig);
-    const showAudioSwitch = klingBottom || audioGenerationEnabled;
     const motionControl = !config.videoWorkflowRef && (isAPIMartKlingMotionControlConfig(config, model) || isKIEKlingMotionControlConfig(config, model) || (videoChannelProtocol(config, model) === "tokendance" && modelKey(model) === "kling-3-0"));
-    const bottomSettingsGridClass = motionControl
-        ? showAudioSwitch ? "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.8fr_0.7fr_auto_auto]" : "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr_auto_auto]"
-        : showAudioSwitch ? "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr_auto_auto]" : "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.7fr_auto_auto]";
     const initializedKlingV3BottomSecondsRef = useRef(false);
 
     useEffect(() => {
@@ -1569,73 +1577,39 @@ function WorkbenchPanel({
 
     if (layout === "bottom") {
         return (
-            <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-5 sm:bottom-7 sm:px-10 lg:px-16">
-                <div className="pointer-events-auto w-full max-w-5xl rounded-[24px] bg-white/65 p-4 shadow-[0_32px_100px_rgba(15,23,42,.22),0_10px_34px_rgba(15,23,42,.10)] ring-1 ring-white/50 backdrop-blur-2xl dark:bg-stone-950/60 dark:ring-white/10 dark:shadow-[0_34px_110px_rgba(0,0,0,.58)]">
-                    <div className="flex flex-col gap-3">
-                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                            <Input.TextArea
-                                value={prompt}
-                                onChange={(event) => onPromptChange(event.target.value)}
-                                placeholder="描述镜头运动、主体动作、场景氛围和画面风格"
-                                autoSize={{ minRows: 2, maxRows: 4 }}
-                                className="rounded-2xl"
-                                onPressEnter={(event) => {
-                                    if (!event.shiftKey && canGenerate) onGenerate();
-                                }}
-                            />
-                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                                <Button title="清空输入" icon={<Trash2 className="size-4" />} onClick={onClearPrompt} />
-                                <Button title="提示词库" icon={<BookOpen className="size-4" />} onClick={onOpenPromptLibrary} />
-                                <Button title="我的素材" icon={<FolderPlus className="size-4" />} onClick={() => onOpenAssetPicker()} />
-                                <Button title="参数配置" className={`lg:hidden ${!bottomSettingsCollapsed ? "!border-sky-500/30 !bg-sky-500/10 !text-sky-500" : ""}`} icon={<SlidersHorizontal className="size-4" />} onClick={() => setBottomSettingsCollapsed?.(!bottomSettingsCollapsed)} />
-                                <Button title="切换到侧边工作台" icon={<PanelLeft className="size-4" />} onClick={() => onLayoutChange("side")} />
-                                <Button type="primary" className="h-9 rounded-xl px-4 font-medium lg:!hidden" icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                                    {pendingCount ? `${pendingCount} 生成中` : "开始创作"}
-                                </Button>
-                            </div>
-                        </div>
-                        {klingBottom && klingBottomProvider !== "kie" ? (
-                            <Input.TextArea
-                                value={negativePrompt}
-                                onChange={(event) => onNegativePromptChange?.(event.target.value)}
-                                placeholder="负面提示词"
-                                autoSize={{ minRows: 1, maxRows: 3 }}
-                                className="rounded-2xl"
-                            />
-                        ) : null}
-                        <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${bottomSettingsGridClass} ${bottomSettingsCollapsed ? "hidden lg:grid" : "grid"}`}>
-                            <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-                                模型
-                                <ModelPicker config={config} value={model} channelId={config.videoChannelId} workflowRef={config.videoWorkflowRef} onWorkflowChange={(value) => updateConfig("videoWorkflowRef", value)} onChange={(value, channelId) => { updateConfig("videoModel", value); if (channelId) updateConfig("videoChannelId", channelId); }} capability="video" className="canvas-compact-control !h-11 !rounded-xl" onMissingConfig={() => openConfigDialog(false)} fullWidth />
-                            </label>
-                            {klingBottom ? (
-                                <KlingV26BottomSettings config={config} updateConfig={updateConfig} generateAudio={generateAudio} isKlingV3={klingBottomVariant === "v3"} />
-                            ) : (
-                                <>
-                                    <QuickSelect label="清晰度" value={normalizeVideoResolutionValue(config.vquality)} options={isSeedanceVideoConfig(config) ? videoResolutionOptions.slice(0, 3) : videoResolutionOptions} onChange={(value) => { updateConfig("vquality", value); updateConfig("size", videoSizeForResolution(value, config.size)); }} />
-                                    <QuickSelect label="尺寸" value={videoSizeForResolution(config.vquality, config.size)} options={videoSizeOptions(config.vquality)} onChange={(value) => updateConfig("size", value)} />
-                                    {cogVideoX3 ? <QuickSelect label="秒数" value={normalizeCogVideoX3Duration(config.videoSeconds)} options={cogVideoX3DurationOptions} onChange={(value) => updateConfig("videoSeconds", value)} /> : <QuickNumber label="秒数" value={autodl ? config.videoSeconds ?? "" : normalizeVideoSeconds(config.videoSeconds)} min={1} max={30} onChange={(value) => updateConfig("videoSeconds", value)} clampOnChange={!autodl} normalizeOnBlur={autodl ? (value) => normalizeAutoDLDuration(value, autodlWorkflow) : undefined} />}
-                                    {audioGenerationEnabled ? <QuickSwitch label="生成音频" checked={generateAudio} onChange={(checked) => updateConfig("videoGenerateAudio", String(checked))} /> : null}
-                                    {motionControl ? <QuickSelect label="角色朝向参考" value={normalizeCharacterOrientation(config.videoCharacterOrientation)} options={characterOrientationOptions} onChange={(value) => updateConfig("videoCharacterOrientation", value)} /> : null}
-                                </>
-                            )}
-                            <QuickNumber label="任务" value={String(taskCount)} min={1} max={6} onChange={(value) => onTaskCountChange(normalizeVideoCount(value))} />
-                            <ReferenceQuickActions imageCount={references.length} videoCount={videoReferences.length} audioCount={audioReferences.length} onPasteReferences={onPasteReferences} onUploadReferences={onUploadReferences} />
-                            <Button type="primary" className="hidden h-11 min-w-28 items-center justify-center gap-1.5 rounded-xl lg:flex" icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                                {pendingCount ? `${pendingCount} 生成中` : "开始创作"}
-                            </Button>
-                        </div>
-                        {firstFrame || lastFrame || references.length || videoReferences.length || audioReferences.length ? (
-                            <div className="grid gap-2">
-                                {firstFrame || lastFrame ? <FrameReferenceStrip firstFrame={firstFrame} lastFrame={lastFrame} compact onUploadFrame={onUploadFrame} onRemoveFrame={onRemoveFrame} /> : null}
-                                {references.length ? <ReferenceImageStrip references={references} compact onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} /> : null}
-                                {videoReferences.length ? <ReferenceVideoStrip references={videoReferences} compact onRemoveReference={onRemoveVideoReference} onMoveReference={onMoveVideoReference} /> : null}
-                                {audioReferences.length ? <ReferenceAudioStrip references={audioReferences} compact onRemoveReference={onRemoveAudioReference} onMoveReference={onMoveAudioReference} /> : null}
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-            </div>
+            <VideoBottomComposer
+                prompt={prompt}
+                negativePrompt={negativePrompt}
+                showNegativePrompt={klingBottom && klingBottomProvider !== "kie"}
+                references={references}
+                firstFrame={firstFrame}
+                lastFrame={lastFrame}
+                videoReferences={videoReferences}
+                audioReferences={audioReferences}
+                config={config}
+                model={model}
+                canGenerate={canGenerate}
+                pendingCount={pendingCount}
+                taskCount={taskCount}
+                onTaskCountChange={onTaskCountChange}
+                updateConfig={updateConfig}
+                openConfigDialog={openConfigDialog}
+                onLayoutChange={onLayoutChange}
+                onPromptChange={onPromptChange}
+                onNegativePromptChange={onNegativePromptChange}
+                onOpenAssetPicker={onOpenAssetPicker}
+                onUploadReferences={onUploadReferences}
+                onUploadFrame={onUploadFrame}
+                onRemoveFrame={onRemoveFrame}
+                onRemoveReference={onRemoveReference}
+                onMoveReference={onMoveReference}
+                onRemoveVideoReference={onRemoveVideoReference}
+                onMoveVideoReference={onMoveVideoReference}
+                onRemoveAudioReference={onRemoveAudioReference}
+                onMoveAudioReference={onMoveAudioReference}
+                onAddReferenceFiles={onAddReferenceFiles}
+                onGenerate={onGenerate}
+            />
         );
     }
 
@@ -1645,62 +1619,296 @@ function WorkbenchPanel({
                 <WorkbenchHeader currentLayout={currentLayout} onLayoutChange={onLayoutChange} />
             </div>
             <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
-                <WorkbenchSection title="提示词">
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPastePrompt}>读取剪贴板</Button>
-                            <Button size="small" icon={<Trash2 className="size-3.5" />} onClick={onClearPrompt}>清空</Button>
-                            <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary}>提示词库</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker()}>我的素材</Button>
+                <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <span className="font-medium text-sm">{t("提示词")}</span>
+                        <div className="flex items-center gap-0.5">
+                            <Button type="text" size="small" className="!px-1.5" title={t("提示词库")} icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary} />
+                            <Button type="text" size="small" className="!px-1.5" title={t("我的素材")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker()} />
                         </div>
-                        <Input.TextArea value={prompt} onChange={(event) => onPromptChange(event.target.value)} rows={6} placeholder="描述镜头运动、主体动作、场景氛围和画面风格" />
                     </div>
-                </WorkbenchSection>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <Input.TextArea
+                            value={prompt}
+                            onChange={(event) => onPromptChange(event.target.value)}
+                            onPaste={(event) => {
+                                const mediaFiles = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/"));
+                                if (!mediaFiles.length) return;
+                                event.preventDefault();
+                                onAddReferenceFiles?.(mediaFiles);
+                            }}
+                            rows={6}
+                            placeholder={t("描述镜头运动、主体动作、场景氛围和画面风格。可 Ctrl+V 粘贴文本，粘贴媒体会加入参考素材")}
+                        />
+                    </div>
+                </section>
                 {frameReferencesEnabled ? (
-                    <WorkbenchSection title="首尾帧" count={[firstFrame, lastFrame].filter(Boolean).length}>
-                        <FrameReferenceStrip firstFrame={firstFrame} lastFrame={lastFrame} onPasteFrame={onPasteFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
-                    </WorkbenchSection>
+                    <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
+                        <div className="flex items-center justify-between gap-2 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{t("首尾帧")}</span>
+                                <Tag className="m-0 text-xs">{[firstFrame, lastFrame].filter(Boolean).length}</Tag>
+                            </div>
+                            <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("firstFrame")} />
+                        </div>
+                        <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                            <FrameReferenceStrip firstFrame={firstFrame} lastFrame={lastFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
+                        </div>
+                    </section>
                 ) : null}
-                <WorkbenchSection title="参考图" count={references.length}>
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteReferences}>剪切板</Button>
-                            <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>上传</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("image")}>从素材库选择</Button>
+                <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{t("参考图")}</span>
+                            <Tag className="m-0 text-xs">{references.length}</Tag>
                         </div>
-                        <ReferenceImageStrip references={references} maxCount={referenceLimits.images} onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} />
+                        <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("image")} />
                     </div>
-                </WorkbenchSection>
-                <WorkbenchSection title="参考视频" count={videoReferences.length}>
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteVideoReferences}>剪贴板</Button>
-                            <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>上传</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("video")}>从素材库选择</Button>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <ReferenceImageStrip references={references} interactive maxCount={referenceLimits.images} onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} onUploadReferences={onUploadReferences} onAddReferenceFiles={onAddReferenceFiles} />
+                    </div>
+                </section>
+                <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{t("参考视频")}</span>
+                            <Tag className="m-0 text-xs">{videoReferences.length}</Tag>
                         </div>
-                        <ReferenceVideoStrip references={videoReferences} maxCount={referenceLimits.videos} onRemoveReference={onRemoveVideoReference} onMoveReference={onMoveVideoReference} />
+                        <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("video")} />
                     </div>
-                </WorkbenchSection>
-                <WorkbenchSection title="参考音频" count={audioReferences.length}>
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteAudioReferences}>剪贴板</Button>
-                            <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>上传</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("audio")}>从素材库选择</Button>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <ReferenceVideoStrip references={videoReferences} interactive maxCount={referenceLimits.videos} onRemoveReference={onRemoveVideoReference} onMoveReference={onMoveVideoReference} onUploadReferences={onUploadReferences} onAddReferenceFiles={onAddReferenceFiles} />
+                    </div>
+                </section>
+                <section className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{t("参考音频")}</span>
+                            <Tag className="m-0 text-xs">{audioReferences.length}</Tag>
                         </div>
-                        <ReferenceAudioStrip references={audioReferences} maxCount={referenceLimits.audios} onRemoveReference={onRemoveAudioReference} onMoveReference={onMoveAudioReference} />
+                        <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker("audio")} />
                     </div>
-                </WorkbenchSection>
+                    <div className="border-t border-stone-200 p-3 dark:border-stone-800">
+                        <ReferenceAudioStrip references={audioReferences} interactive maxCount={referenceLimits.audios} onRemoveReference={onRemoveAudioReference} onMoveReference={onMoveAudioReference} onUploadReferences={onUploadReferences} onAddReferenceFiles={onAddReferenceFiles} />
+                    </div>
+                </section>
                 {motionControl ? <CharacterOrientationSetting value={config.videoCharacterOrientation} onChange={(value) => updateConfig("videoCharacterOrientation", value)} /> : null}
                 <GenerationSettings config={config} model={model} updateConfig={updateConfig} openConfigDialog={openConfigDialog} />
-                <WorkbenchSection title="任务数量">
+                <WorkbenchSection title={t("任务数量")}>
                     <TaskCountControl value={taskCount} onChange={onTaskCountChange} />
                 </WorkbenchSection>
             </div>
             <div className="shrink-0 border-t border-stone-200 p-4 dark:border-stone-800">
                 <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
-                    {pendingCount ? `生成中（${pendingCount}）` : "开始生成"}
+                    {pendingCount ? t("生成中（{pendingCount}）", { pendingCount }) : t("开始生成")}
                 </Button>
+            </div>
+        </div>
+    );
+}
+
+function VideoBottomComposer({
+    prompt,
+    negativePrompt = "",
+    showNegativePrompt,
+    references,
+    firstFrame,
+    lastFrame,
+    videoReferences,
+    audioReferences,
+    config,
+    model,
+    canGenerate,
+    pendingCount,
+    taskCount,
+    onTaskCountChange,
+    updateConfig,
+    openConfigDialog,
+    onLayoutChange,
+    onPromptChange,
+    onNegativePromptChange,
+    onOpenAssetPicker,
+    onUploadReferences,
+    onUploadFrame,
+    onRemoveFrame,
+    onRemoveReference,
+    onMoveReference,
+    onRemoveVideoReference,
+    onMoveVideoReference,
+    onRemoveAudioReference,
+    onMoveAudioReference,
+    onAddReferenceFiles,
+    onGenerate,
+}: {
+    prompt: string;
+    negativePrompt?: string;
+    showNegativePrompt: boolean;
+    references: ReferenceImage[];
+    firstFrame: ReferenceImage | null;
+    lastFrame: ReferenceImage | null;
+    videoReferences: ReferenceVideo[];
+    audioReferences: ReferenceAudio[];
+    config: AiConfig;
+    model: string;
+    canGenerate: boolean;
+    pendingCount: number;
+    taskCount: number;
+    onTaskCountChange: (value: number) => void;
+    updateConfig: UpdateAiConfig;
+    openConfigDialog: (shouldPromptContinue?: boolean) => void;
+    onLayoutChange: (layout: WorkbenchLayout) => void;
+    onPromptChange: (value: string) => void;
+    onNegativePromptChange?: (value: string) => void;
+    onOpenAssetPicker: (target?: AssetPickerTarget) => void;
+    onUploadReferences: () => void;
+    onUploadFrame: (slot: "first" | "last") => void;
+    onRemoveFrame: (slot: "first" | "last") => void;
+    onRemoveReference: (id: string) => void;
+    onMoveReference: (index: number, offset: number) => void;
+    onRemoveVideoReference: (id: string) => void;
+    onMoveVideoReference: (index: number, offset: number) => void;
+    onRemoveAudioReference: (id: string) => void;
+    onMoveAudioReference: (index: number, offset: number) => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+    onGenerate: () => void;
+}) {
+    const [dragOver, setDragOver] = useState(false);
+    const hasReferences = Boolean(firstFrame || lastFrame || references.length || videoReferences.length || audioReferences.length);
+
+    const acceptDroppedFiles = (event: ReactDragEvent) => {
+        event.preventDefault();
+        setDragOver(false);
+        const files = Array.from(event.dataTransfer.files || []).filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/"));
+        if (files.length) onAddReferenceFiles?.(files);
+    };
+
+    const handlePromptPaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+        const mediaFiles = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/"));
+        if (!mediaFiles.length) return;
+        event.preventDefault();
+        onAddReferenceFiles?.(mediaFiles);
+    };
+
+    return (
+        <div className="relative z-40 w-full shrink-0">
+            <div
+                className={`w-full rounded-2xl border px-4 pb-4 pt-4 shadow-[0_24px_80px_rgba(15,23,42,.18)] backdrop-blur-xl transition-colors dark:shadow-[0_28px_90px_rgba(0,0,0,.55)] sm:px-5 sm:pb-5 sm:pt-5 ${
+                    dragOver
+                        ? "border-sky-400/80 bg-sky-50/90 dark:border-sky-400/50 dark:bg-sky-950/70"
+                        : "border-stone-200/80 bg-white/90 dark:border-white/10 dark:bg-[#161616]/92"
+                }`}
+                onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOver(false);
+                }}
+                onDrop={acceptDroppedFiles}
+            >
+                {hasReferences ? (
+                    <div className="mb-3 grid gap-2">
+                        {firstFrame || lastFrame ? <FrameReferenceStrip firstFrame={firstFrame} lastFrame={lastFrame} compact onUploadFrame={onUploadFrame} onRemoveFrame={onRemoveFrame} /> : null}
+                        {references.length ? <ReferenceImageStrip references={references} compact onRemoveReference={onRemoveReference} onMoveReference={onMoveReference} /> : null}
+                        {videoReferences.length ? <ReferenceVideoStrip references={videoReferences} compact onRemoveReference={onRemoveVideoReference} onMoveReference={onMoveVideoReference} /> : null}
+                        {audioReferences.length ? <ReferenceAudioStrip references={audioReferences} compact onRemoveReference={onRemoveAudioReference} onMoveReference={onMoveAudioReference} /> : null}
+                    </div>
+                ) : null}
+
+                <Input.TextArea
+                    value={prompt}
+                    onChange={(event) => onPromptChange(event.target.value)}
+                    onPaste={handlePromptPaste}
+                    placeholder={dragOver ? t("松开以添加参考素材") : t("描述镜头运动、主体动作、场景氛围和画面风格。可 Ctrl+V 粘贴文本，粘贴媒体会加入参考素材")}
+                    autoSize={{ minRows: 4, maxRows: 10 }}
+                    className="!min-h-28 !resize-none !border-0 !bg-transparent !p-1 !shadow-none !outline-none focus:!shadow-none dark:!bg-transparent"
+                    onPressEnter={(event) => {
+                        if (!event.shiftKey && canGenerate) {
+                            event.preventDefault();
+                            onGenerate();
+                        }
+                    }}
+                />
+                {showNegativePrompt ? (
+                    <Input.TextArea
+                        value={negativePrompt}
+                        onChange={(event) => onNegativePromptChange?.(event.target.value)}
+                        placeholder={t("负面提示词")}
+                        autoSize={{ minRows: 1, maxRows: 3 }}
+                        className="mt-2 !resize-none !border-0 !bg-transparent !p-1 !shadow-none !outline-none focus:!shadow-none dark:!bg-transparent"
+                    />
+                ) : null}
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                        <Dropdown
+                            trigger={["click"]}
+                            menu={{
+                                items: [
+                                    { key: "upload", icon: <Upload className="size-4" />, label: t("上传参考素材") },
+                                    { key: "assets", icon: <FolderOpen className="size-4" />, label: t("我的素材") },
+                                ],
+                                onClick: ({ key }) => (key === "upload" ? onUploadReferences() : onOpenAssetPicker()),
+                            }}
+                        >
+                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Plus className="size-4" />} aria-label={t("添加素材")} title={t("添加素材")} />
+                        </Dropdown>
+                        <CanvasPromptPopover onSelect={onPromptChange} />
+                        <div className="min-w-0 max-w-[168px]">
+                            <ModelPicker
+                                config={config}
+                                value={model}
+                                capability="video"
+                                channelId={config.videoChannelId}
+                                workflowRef={config.videoWorkflowRef}
+                                onWorkflowChange={(value) => updateConfig("videoWorkflowRef", value)}
+                                onChange={(value, channelId) => {
+                                    updateConfig("videoModel", value);
+                                    if (channelId) updateConfig("videoChannelId", channelId);
+                                }}
+                                className="canvas-compact-control !h-8 !rounded-full"
+                                onMissingConfig={() => openConfigDialog(false)}
+                                fullWidth
+                            />
+                        </div>
+                        <CanvasVideoSettingsPopover
+                            config={{ ...config, model }}
+                            placement="topLeft"
+                            buttonIcon={<VideoIcon className="size-3.5" />}
+                            buttonClassName="!h-8 !max-w-[150px] !justify-start !rounded-full !px-2.5"
+                            onConfigChange={(key, value) => updateConfig(key, value)}
+                        />
+                        <label className="flex h-8 items-center gap-1 rounded-full border border-stone-200 bg-transparent px-2.5 text-xs text-stone-500 dark:border-stone-700 dark:text-stone-400">
+                            <span className="shrink-0">{t("任务")}</span>
+                            <input
+                                className="h-6 w-8 border-0 bg-transparent p-0 text-center text-sm text-stone-900 outline-none dark:text-stone-100"
+                                type="number"
+                                min={1}
+                                max={6}
+                                value={taskCount}
+                                onChange={(event) => onTaskCountChange(normalizeVideoCount(event.target.value))}
+                            />
+                        </label>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                        <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<PanelLeft className="size-4" />} title={t("切换到侧边工作台")} onClick={() => onLayoutChange("side")} />
+                        <Button
+                            type="primary"
+                            shape="circle"
+                            className="!size-10 !min-w-10"
+                            disabled={!canGenerate}
+                            onClick={onGenerate}
+                            aria-label={pendingCount ? t("继续生成") : t("开始生成")}
+                            title={pendingCount ? t("{pendingCount} 生成中", { pendingCount }) : t("开始生成")}
+                            icon={pendingCount ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                        />
+                    </div>
+                </div>
+
             </div>
         </div>
     );
@@ -1709,10 +1917,10 @@ function WorkbenchPanel({
 function WorkbenchHeader({ currentLayout, onLayoutChange }: { currentLayout: WorkbenchLayout; onLayoutChange: (layout: WorkbenchLayout) => void }) {
     return (
         <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">视频创作台</h1>
+            <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{t("视频创作台")}</h1>
             <div className="flex shrink-0 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-900">
-                <Button size="small" type={currentLayout === "side" ? "primary" : "text"} icon={<PanelLeft className="size-3.5" />} onClick={() => onLayoutChange("side")}>侧边</Button>
-                <Button size="small" type={currentLayout === "bottom" ? "primary" : "text"} icon={<PanelBottom className="size-3.5" />} onClick={() => onLayoutChange("bottom")}>底部</Button>
+                <Button size="small" type={currentLayout === "side" ? "primary" : "text"} icon={<PanelLeft className="size-3.5" />} onClick={() => onLayoutChange("side")}>{t("侧边")}</Button>
+                <Button size="small" type={currentLayout === "bottom" ? "primary" : "text"} icon={<PanelBottom className="size-3.5" />} onClick={() => onLayoutChange("bottom")}>{t("底部")}</Button>
             </div>
         </div>
     );
@@ -1734,29 +1942,27 @@ function FrameReferenceStrip({ firstFrame, lastFrame, compact = false, onPasteFr
     if (!compact) {
         return (
             <div className="space-y-2">
-                <FrameReferenceRow label="首帧" slot="first" reference={firstFrame} onPasteFrame={onPasteFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
-                <FrameReferenceRow label="尾帧" slot="last" reference={lastFrame} onPasteFrame={onPasteFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
+                <FrameReferenceRow label={t("首帧")} slot="first" reference={firstFrame} onPasteFrame={onPasteFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
+                <FrameReferenceRow label={t("尾帧")} slot="last" reference={lastFrame} onPasteFrame={onPasteFrame} onUploadFrame={onUploadFrame} onOpenAssetPicker={onOpenAssetPicker} onRemoveFrame={onRemoveFrame} />
             </div>
         );
     }
     return (
         <div className={`grid grid-cols-2 gap-2 rounded-lg border border-dashed border-stone-300 p-2 dark:border-stone-700 ${compact ? "min-h-14" : "min-h-24"}`}>
-            <FrameReferenceSlot label="首帧" reference={firstFrame} compact={compact} onUpload={() => onUploadFrame("first")} onRemove={() => onRemoveFrame("first")} />
-            <FrameReferenceSlot label="尾帧" reference={lastFrame} compact={compact} onUpload={() => onUploadFrame("last")} onRemove={() => onRemoveFrame("last")} />
+            <FrameReferenceSlot label={t("首帧")} reference={firstFrame} compact={compact} onUpload={() => onUploadFrame("first")} onRemove={() => onRemoveFrame("first")} />
+            <FrameReferenceSlot label={t("尾帧")} reference={lastFrame} compact={compact} onUpload={() => onUploadFrame("last")} onRemove={() => onRemoveFrame("last")} />
         </div>
     );
 }
 
-function FrameReferenceRow({ label, slot, reference, onPasteFrame, onUploadFrame, onOpenAssetPicker, onRemoveFrame }: { label: string; slot: "first" | "last"; reference: ReferenceImage | null; onPasteFrame?: (slot: "first" | "last") => void; onUploadFrame: (slot: "first" | "last") => void; onOpenAssetPicker?: (target?: AssetPickerTarget) => void; onRemoveFrame: (slot: "first" | "last") => void }) {
+function FrameReferenceRow({ label, slot, reference, onUploadFrame, onOpenAssetPicker, onRemoveFrame }: { label: string; slot: "first" | "last"; reference: ReferenceImage | null; onPasteFrame?: (slot: "first" | "last") => void; onUploadFrame: (slot: "first" | "last") => void; onOpenAssetPicker?: (target?: AssetPickerTarget) => void; onRemoveFrame: (slot: "first" | "last") => void }) {
     return (
         <div className="space-y-2 rounded-lg border border-dashed border-stone-300 p-2 dark:border-stone-700">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-medium text-stone-600 dark:text-stone-300">{label}</span>
-                <div className="flex flex-wrap gap-1">
-                    <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => onPasteFrame?.(slot)}>读取剪贴板</Button>
-                    <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => onUploadFrame(slot)}>上传</Button>
-                    <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker?.(slot === "first" ? "firstFrame" : "lastFrame")}>从素材库选择</Button>
-                </div>
+                {onOpenAssetPicker ? (
+                    <Button type="text" size="small" className="!px-1.5" title={t("从素材库选择")} icon={<FolderPlus className="size-3.5" />} onClick={() => onOpenAssetPicker(slot === "first" ? "firstFrame" : "lastFrame")} />
+                ) : null}
             </div>
             <FrameReferenceSlot label={label} reference={reference} compact={false} onUpload={() => onUploadFrame(slot)} onRemove={() => onRemoveFrame(slot)} />
         </div>
@@ -1771,59 +1977,169 @@ function FrameReferenceSlot({ label, reference, compact, onUpload, onRemove }: {
                     <img src={reference.dataUrl} alt={reference.name} className="size-full object-cover" />
                     <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">{label}</span>
                     <span className="absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1 py-0.5 text-[10px] text-white">{reference.name}</span>
-                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={onRemove} aria-label={`移除${label}`}>
+                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={onRemove} aria-label={t("移除{label}", { label })}>
                         <Trash2 className="size-3.5" />
                     </button>
                 </>
             ) : (
                 <button type="button" className="flex size-full items-center justify-center gap-1" onClick={onUpload}>
                     <Upload className="size-3.5" />
-                    上传{label}
+                    
+                    {t("上传")}{label}
                 </button>
             )}
         </div>
     );
 }
 
-function ReferenceImageStrip({ references, compact = false, maxCount = SEEDANCE_REFERENCE_LIMITS.images, onRemoveReference, onMoveReference }: { references: ReferenceImage[]; compact?: boolean; maxCount?: number; onRemoveReference: (id: string) => void; onMoveReference: (index: number, offset: number) => void }) {
+function useReferenceDropZone({
+    interactive,
+    accept,
+    onUploadReferences,
+    onAddReferenceFiles,
+}: {
+    interactive?: boolean;
+    accept: (file: File) => boolean;
+    onUploadReferences?: () => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+}) {
+    const [dragOver, setDragOver] = useState(false);
+    if (!interactive) return { dragOver: false, props: {} as Record<string, never> };
+    return {
+        dragOver,
+        props: {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick: (event: ReactMouseEvent<HTMLDivElement>) => {
+                if ((event.target as HTMLElement).closest("button, video, audio")) return;
+                onUploadReferences?.();
+            },
+            onDragEnter: (event: ReactDragEvent) => {
+                event.preventDefault();
+                setDragOver(true);
+            },
+            onDragOver: (event: ReactDragEvent) => {
+                event.preventDefault();
+                setDragOver(true);
+            },
+            onDragLeave: (event: ReactDragEvent) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOver(false);
+            },
+            onDrop: (event: ReactDragEvent) => {
+                event.preventDefault();
+                setDragOver(false);
+                const files = Array.from(event.dataTransfer.files || []).filter(accept);
+                if (files.length) onAddReferenceFiles?.(files);
+            },
+        },
+    };
+}
+
+function ReferenceImageStrip({
+    references,
+    compact = false,
+    interactive = false,
+    maxCount = SEEDANCE_REFERENCE_LIMITS.images,
+    onRemoveReference,
+    onMoveReference,
+    onUploadReferences,
+    onAddReferenceFiles,
+}: {
+    references: ReferenceImage[];
+    compact?: boolean;
+    interactive?: boolean;
+    maxCount?: number;
+    onRemoveReference: (id: string) => void;
+    onMoveReference: (index: number, offset: number) => void;
+    onUploadReferences?: () => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+}) {
+    const { dragOver, props } = useReferenceDropZone({ interactive, accept: (file) => file.type.startsWith("image/"), onUploadReferences, onAddReferenceFiles });
     return (
-        <div className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed border-stone-300 p-2 overscroll-x-contain dark:border-stone-700 ${compact ? "min-h-14" : "min-h-24 pb-3"}`}>
+        <div
+            className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed p-2 overscroll-x-contain ${dragOver ? "border-sky-400 bg-sky-50/60 dark:border-sky-400/50 dark:bg-sky-950/40" : "border-stone-300 dark:border-stone-700"} ${compact ? "min-h-14" : "min-h-24 pb-3"} ${interactive ? "cursor-pointer" : ""}`}
+            {...props}
+        >
             {references.map((item, index) => (
                 <div key={item.id} className={`${compact ? "size-12" : "size-20"} group relative shrink-0 overflow-hidden rounded-md border border-stone-200 dark:border-stone-800`}>
                     <img src={item.dataUrl} alt={item.name} className="size-full object-cover" />
                     <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">{seedanceReferenceLabel("image", index)}</span>
                     <ReferenceOrderButtons index={index} total={references.length} onMove={(offset) => onMoveReference(index, offset)} />
-                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label="移除参考图">
+                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label={t("移除参考图")}>
                         <Trash2 className="size-3.5" />
                     </button>
                 </div>
             ))}
-            {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">暂无参考图，最多 {maxCount} 张</div> : null}
+            {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">{dragOver ? t("松开以添加参考图") : t("点击上传，或拖拽 / Ctrl+V 粘贴，最多 {maxCount} 张", { maxCount })}</div> : null}
         </div>
     );
 }
 
-function ReferenceVideoStrip({ references, compact = false, maxCount = SEEDANCE_REFERENCE_LIMITS.videos, onRemoveReference, onMoveReference }: { references: ReferenceVideo[]; compact?: boolean; maxCount?: number; onRemoveReference: (id: string) => void; onMoveReference: (index: number, offset: number) => void }) {
+function ReferenceVideoStrip({
+    references,
+    compact = false,
+    interactive = false,
+    maxCount = SEEDANCE_REFERENCE_LIMITS.videos,
+    onRemoveReference,
+    onMoveReference,
+    onUploadReferences,
+    onAddReferenceFiles,
+}: {
+    references: ReferenceVideo[];
+    compact?: boolean;
+    interactive?: boolean;
+    maxCount?: number;
+    onRemoveReference: (id: string) => void;
+    onMoveReference: (index: number, offset: number) => void;
+    onUploadReferences?: () => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+}) {
+    const { dragOver, props } = useReferenceDropZone({ interactive, accept: (file) => file.type.startsWith("video/"), onUploadReferences, onAddReferenceFiles });
     return (
-        <div className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed border-stone-300 p-2 overscroll-x-contain dark:border-stone-700 ${compact ? "min-h-14" : "min-h-24 pb-3"}`}>
+        <div
+            className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed p-2 overscroll-x-contain ${dragOver ? "border-sky-400 bg-sky-50/60 dark:border-sky-400/50 dark:bg-sky-950/40" : "border-stone-300 dark:border-stone-700"} ${compact ? "min-h-14" : "min-h-24 pb-3"} ${interactive ? "cursor-pointer" : ""}`}
+            {...props}
+        >
             {references.map((item, index) => (
                 <div key={item.id} className={`${compact ? "h-12 w-20" : "h-20 w-32"} group relative shrink-0 overflow-hidden rounded-md border border-stone-200 bg-black dark:border-stone-800`}>
                     <video src={item.url} className="size-full object-cover" muted preload="metadata" />
                     <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">{seedanceReferenceLabel("video", index)}</span>
                     <ReferenceOrderButtons index={index} total={references.length} onMove={(offset) => onMoveReference(index, offset)} />
-                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label="移除参考视频">
+                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label={t("移除参考视频")}>
                         <Trash2 className="size-3.5" />
                     </button>
                 </div>
             ))}
-            {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">暂无参考视频，最多 {maxCount} 个</div> : null}
+            {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">{dragOver ? t("松开以添加参考视频") : t("点击上传，或拖拽文件，最多 {maxCount} 个", { maxCount })}</div> : null}
         </div>
     );
 }
 
-function ReferenceAudioStrip({ references, compact = false, maxCount = SEEDANCE_REFERENCE_LIMITS.audios, onRemoveReference, onMoveReference }: { references: ReferenceAudio[]; compact?: boolean; maxCount?: number; onRemoveReference: (id: string) => void; onMoveReference: (index: number, offset: number) => void }) {
+function ReferenceAudioStrip({
+    references,
+    compact = false,
+    interactive = false,
+    maxCount = SEEDANCE_REFERENCE_LIMITS.audios,
+    onRemoveReference,
+    onMoveReference,
+    onUploadReferences,
+    onAddReferenceFiles,
+}: {
+    references: ReferenceAudio[];
+    compact?: boolean;
+    interactive?: boolean;
+    maxCount?: number;
+    onRemoveReference: (id: string) => void;
+    onMoveReference: (index: number, offset: number) => void;
+    onUploadReferences?: () => void;
+    onAddReferenceFiles?: (files: File[]) => void;
+}) {
+    const { dragOver, props } = useReferenceDropZone({ interactive, accept: (file) => file.type.startsWith("audio/") || /\.(mp3|wav)$/i.test(file.name), onUploadReferences, onAddReferenceFiles });
     return (
-        <div className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed border-stone-300 p-2 overscroll-x-contain dark:border-stone-700 ${compact ? "min-h-14" : "min-h-24 pb-3"}`}>
+        <div
+            className={`hover-scrollbar hover-scrollbar-hint flex w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed p-2 overscroll-x-contain ${dragOver ? "border-sky-400 bg-sky-50/60 dark:border-sky-400/50 dark:bg-sky-950/40" : "border-stone-300 dark:border-stone-700"} ${compact ? "min-h-14" : "min-h-24 pb-3"} ${interactive ? "cursor-pointer" : ""}`}
+            {...props}
+        >
             {references.map((item, index) => (
                 <div key={item.id} className={`${compact ? "h-12 w-40" : "h-20 w-48"} group relative flex shrink-0 flex-col justify-center gap-2 rounded-md border border-stone-200 bg-stone-50 px-2 dark:border-stone-800 dark:bg-stone-900`}>
                     <div className="flex min-w-0 items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
@@ -1833,22 +2149,12 @@ function ReferenceAudioStrip({ references, compact = false, maxCount = SEEDANCE_
                     </div>
                     {!compact ? <audio src={item.url} controls className="h-8 w-full" preload="metadata" /> : null}
                     <ReferenceOrderButtons index={index} total={references.length} onMove={(offset) => onMoveReference(index, offset)} />
-                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label="移除参考音频">
+                    <button type="button" className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" onClick={() => onRemoveReference(item.id)} aria-label={t("移除参考音频")}>
                         <Trash2 className="size-3.5" />
                     </button>
                 </div>
             ))}
-            {!references.length ? <div className="flex min-w-full items-center justify-center text-center text-sm text-stone-500">暂无参考音频，最多 {maxCount} 个，mp3/wav，单个 15MB 内</div> : null}
-        </div>
-    );
-}
-
-function ReferenceQuickActions({ imageCount, videoCount, audioCount, onPasteReferences, onUploadReferences }: { imageCount: number; videoCount: number; audioCount: number; onPasteReferences: () => void; onUploadReferences: () => void }) {
-    return (
-        <div className="flex h-11 items-center gap-1 rounded-xl border border-stone-200 bg-background px-2 dark:border-stone-800">
-            {imageCount || videoCount || audioCount ? <span className="min-w-7 text-xs text-stone-500">{imageCount + videoCount + audioCount} 个</span> : null}
-            <Button title="读取剪切板" size="small" type="text" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteReferences} />
-            <Button title="上传参考素材" size="small" type="text" icon={<Upload className="size-3.5" />} onClick={onUploadReferences} />
+            {!references.length ? <div className="flex min-w-full items-center justify-center text-center text-sm text-stone-500">{dragOver ? t("松开以添加参考音频") : t("点击上传，或拖拽文件，最多 {maxCount} 个", { maxCount })}</div> : null}
         </div>
     );
 }
@@ -1856,7 +2162,7 @@ function ReferenceQuickActions({ imageCount, videoCount, audioCount, onPasteRefe
 function TaskCountControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
     return (
         <label className="flex h-11 items-center gap-2 rounded-xl border border-stone-200 bg-background px-3 text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">
-            <span className="shrink-0">任务</span>
+            <span className="shrink-0">{t("任务")}</span>
             <input className="h-7 w-16 rounded-lg border border-stone-200 bg-background px-2 text-sm text-stone-900 outline-none dark:border-stone-800 dark:text-stone-100" type="number" min={1} max={6} value={value} onChange={(event) => onChange(normalizeVideoCount(event.target.value))} />
         </label>
     );
@@ -1865,7 +2171,7 @@ function TaskCountControl({ value, onChange }: { value: number; onChange: (value
 function CharacterOrientationSetting({ value, onChange }: { value: string; onChange: (value: string) => void }) {
     const current = normalizeCharacterOrientation(value);
     return (
-        <WorkbenchSection title="角色朝向参考">
+        <WorkbenchSection title={t("角色朝向参考")}>
             <div className="grid grid-cols-2 gap-2.5">
                 {characterOrientationOptions.map((item) => (
                     <button key={item.value} type="button" className={optionPillClass(current === item.value)} onClick={() => onChange(item.value)}>
@@ -1884,66 +2190,12 @@ function optionPillClass(active: boolean) {
     ].join(" ");
 }
 
-function QuickSelect({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
-    return (
-        <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-            {label}
-            <select className="h-11 min-w-0 rounded-xl border border-stone-200 bg-background px-3 text-sm text-stone-900 outline-none dark:border-stone-800 dark:text-stone-100" value={value} onChange={(event) => onChange(event.target.value)}>
-                {options.map((item) => (
-                    <option key={item.value} value={item.value}>
-                        {item.label}
-                    </option>
-                ))}
-            </select>
-        </label>
-    );
-}
-
-function QuickNumber({ label, value, min, max, onChange, clampOnChange = true, normalizeOnBlur }: { label: string; value: string; min: number; max: number; onChange: (value: string) => void; clampOnChange?: boolean; normalizeOnBlur?: (value: string) => string }) {
-    return (
-        <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-            {label}
-            <input className="h-11 min-w-0 rounded-xl border border-stone-200 bg-background px-3 text-sm text-stone-900 outline-none dark:border-stone-800 dark:text-stone-100" type="number" min={min} max={max} value={value} onChange={(event) => onChange(clampOnChange ? clampQuickNumberValue(event.target.value, min, max) : event.target.value)} onBlur={(event) => onChange(normalizeOnBlur ? normalizeOnBlur(event.target.value) : clampQuickNumberValue(event.target.value, min, max))} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
-        </label>
-    );
-}
-
-function clampQuickNumberValue(value: string, min: number, max: number) {
-    const number = Math.floor(Number(value) || min);
-    return String(Math.max(min, Math.min(max, number)));
-}
-
-function KlingV26BottomSettings({ config, updateConfig, generateAudio, isKlingV3 }: { config: AiConfig; updateConfig: UpdateAiConfig; generateAudio: boolean; isKlingV3: boolean }) {
-    const mode = isKlingV3 && config.videoMode === "4k" ? "4k" : config.videoMode === "pro" ? "pro" : "std";
-    const modeOptions = isKlingV3 ? [{ value: "std", label: "720P" }, { value: "pro", label: "1080P" }, { value: "4k", label: "4K" }] : [{ value: "std", label: "标准(720P 无声)" }, { value: "pro", label: "专业(1080P 音频)" }];
-    return (
-        <>
-            <QuickSelect label="模式选择" value={mode} options={modeOptions} onChange={(value) => updateConfig("videoMode", value)} />
-            <QuickSelect label="尺寸" value={klingBottomSizeValue(config.size)} options={[{ value: "16:9", label: "16:9" }, { value: "9:16", label: "9:16" }, { value: "1:1", label: "1:1" }]} onChange={(value) => updateConfig("size", value === "1:1" ? "1024x1024" : value)} />
-            <QuickNumber label="秒数" value={isKlingV3 ? String(config.videoSeconds ?? "") : normalizeKlingV26Seconds(config.videoSeconds)} min={isKlingV3 ? 3 : 5} max={isKlingV3 ? 15 : 10} onChange={(value) => updateConfig("videoSeconds", isKlingV3 ? value : normalizeKlingV26Seconds(value))} clampOnChange={!isKlingV3} />
-            <QuickSwitch label="生成音频" checked={generateAudio} onChange={(checked) => updateConfig("videoGenerateAudio", String(checked))} />
-        </>
-    );
-}
-
-
-function QuickSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-    return (
-        <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-            {label}
-            <span className="flex h-11 items-center justify-center rounded-xl border border-stone-200 bg-background px-3 dark:border-stone-800">
-                <Switch size="small" checked={checked} onChange={onChange} />
-            </span>
-        </label>
-    );
-}
-
 function GenerationSettings({ config, model, updateConfig, openConfigDialog }: { config: AiConfig; model: string; updateConfig: UpdateAiConfig; openConfigDialog: (shouldPromptContinue?: boolean) => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     return (
         <div className="space-y-3">
-            <WorkbenchSection title="模型">
+            <WorkbenchSection title={t("模型")}>
                 <ModelPicker config={config} value={model} channelId={config.videoChannelId} workflowRef={config.videoWorkflowRef} onWorkflowChange={(value) => updateConfig("videoWorkflowRef", value)} onChange={(value, channelId) => { updateConfig("videoModel", value); if (channelId) updateConfig("videoChannelId", channelId); }} capability="video" fullWidth onMissingConfig={() => openConfigDialog(false)} />
             </WorkbenchSection>
             <VideoSettingsPanel config={config} modelName={model} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-3" />
@@ -2012,20 +2264,20 @@ function ResultsPanel({
             <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                     <HistoryIcon />
-                    <h2 className="truncate text-xl font-semibold">全部成果</h2>
+                    <h2 className="truncate text-xl font-semibold">{t("全部成果")}</h2>
                     <Tag className="m-0">{totalCount}</Tag>
-                    {pendingCount ? <Tag className="m-0 px-2 py-1">{pendingCount} 个生成中</Tag> : null}
+                    {pendingCount ? <Tag className="m-0 px-2 py-1">{pendingCount}  {t("个生成中")}</Tag> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                    <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>新建</Button>
-                    <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!visibleLogs.length} onClick={toggleVisibleLogs}>{allSelected ? "取消" : "全选"}</Button>
-                    <Button size="small" icon={<Download className="size-3.5" />} disabled={!selectedVideos.length} onClick={() => selectedVideos.forEach(onDownload)}>下载</Button>
-                    <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>删除</Button>
+                    <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>{t("新建")}</Button>
+                    <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!visibleLogs.length} onClick={toggleVisibleLogs}>{allSelected ? t("取消") : t("全选")}</Button>
+                    <Button size="small" icon={<Download className="size-3.5" />} disabled={!selectedVideos.length} onClick={() => selectedVideos.forEach(onDownload)}>{t("下载")}</Button>
+                    <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>{t("删除")}</Button>
                 </div>
             </div>
             {totalCount ? (
                 <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                    {visibleResults.map((result, index) => (result.status === "success" && result.video ? <ResultVideoCard key={result.id} result={result} video={result.video} index={index} syncing={syncingVideoIds.includes(result.video.id)} onCopyPrompt={onCopyPrompt} onDownload={onDownload} onSync={(video) => onSyncResult(result.id, video, index)} onSaveAsset={onSaveAsset} /> : result.status === "failed" ? <FailedVideoCard key={result.id} result={result} error={result.error || "生成失败"} onCopyPrompt={onCopyPrompt} onPreview={() => onPreviewResult(result)} onRetry={() => onRetryResult(result)} /> : <PendingVideoCard key={result.id} result={result} now={now} onCopyPrompt={onCopyPrompt} onStop={() => onStopResult(result)} onRetry={() => onRetryResult(result)} onDelete={() => { const log = logs.find((item) => item.id === (result.taskLogId || result.id)); if (log) onDeleteLog(log); }} />))}
+                    {visibleResults.map((result, index) => (result.status === "success" && result.video ? <ResultVideoCard key={result.id} result={result} video={result.video} index={index} syncing={syncingVideoIds.includes(result.video.id)} onCopyPrompt={onCopyPrompt} onDownload={onDownload} onSync={(video) => onSyncResult(result.id, video, index)} onSaveAsset={onSaveAsset} /> : result.status === "failed" ? <FailedVideoCard key={result.id} result={result} error={result.error || t("生成失败")} onCopyPrompt={onCopyPrompt} onPreview={() => onPreviewResult(result)} onRetry={() => onRetryResult(result)} /> : <PendingVideoCard key={result.id} result={result} now={now} onCopyPrompt={onCopyPrompt} onStop={() => onStopResult(result)} onRetry={() => onRetryResult(result)} onDelete={() => { const log = logs.find((item) => item.id === (result.taskLogId || result.id)); if (log) onDeleteLog(log); }} />))}
                     {visibleLogs.map((log, index) => (
                         <HistoryLogCard key={log.id} log={log} index={index} selected={selectedLogIds.includes(log.id)} active={activeLogId === log.id} syncing={Boolean(log.video && syncingVideoIds.includes(log.video.id))} onSelectedChange={(checked) => onSelectedLogIdsChange(checked ? [...selectedLogIds, log.id] : selectedLogIds.filter((id) => id !== log.id))} onDelete={() => onDeleteLog(log)} onPreview={() => onPreviewLog(log)} onRetry={() => onRetryLog(log)} onCopyPrompt={onCopyPrompt} onDownload={onDownload} onSync={(video) => onSyncLog(log, video, index)} onSaveAsset={onSaveAsset} />
                     ))}
@@ -2033,7 +2285,7 @@ function ResultsPanel({
             ) : (
                 <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
                     <VideoIcon className="mb-4 size-11 text-stone-400" />
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有生成视频" />
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("还没有生成视频")} />
                 </div>
             )}
         </section>
@@ -2050,7 +2302,7 @@ function ResultVideoCard({ result, video, index, syncing, onCopyPrompt, onDownlo
             <div className="relative aspect-video bg-black">
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
                     <VideoSourceTag video={video} />
-                    <Tag className="m-0 text-[10px]" color="blue">成功</Tag>
+                    <Tag className="m-0 text-[10px]" color="blue">{t("成功")}</Tag>
                 </div>
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
                 <video src={video.url} controls className="size-full object-contain" />
@@ -2072,17 +2324,17 @@ function PendingVideoCard({ result, now, onCopyPrompt, onStop, onRetry, onDelete
                 <div className="absolute inset-0 opacity-60" style={{ backgroundImage: "radial-gradient(circle, rgba(120,113,108,0.35) 1.4px, transparent 1.6px)", backgroundSize: "16px 16px" }} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-stone-500 dark:text-stone-400">
                     {stopped ? <Square className="size-6" /> : <LoaderCircle className="size-6 animate-spin" />}
-                    {stopped || stopping ? <span>{stopped ? "已停止" : result.error ? "停止未确认" : "停止中"}</span> : progress !== null ? <span className="animate-pulse font-semibold text-sky-500">正在创作 {progress}%</span> : <span>生成中</span>}
+                    {stopped || stopping ? <span>{stopped ? t("已停止") : result.error ? t("停止未确认") : t("停止中")}</span> : progress !== null ? <span className="animate-pulse font-semibold text-sky-500">{t("正在创作")} {progress}%</span> : <span>{t("生成中")}</span>}
                     <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-stone-600 shadow-sm dark:bg-stone-950/70 dark:text-stone-300">{formatDuration(durationMs)}</span>
-                    <Button type={stopped ? "default" : "primary"} danger={!stopped} disabled={stopping && !result.error} onClick={stopped ? onRetry : onStop} aria-label={stopped ? "重新生成" : stopping ? result.error ? "重试停止" : "停止中" : "停止"} className="!h-6 !min-w-12 !rounded-full !px-3">
+                    <Button type={stopped ? "default" : "primary"} danger={!stopped} disabled={stopping && !result.error} onClick={stopped ? onRetry : onStop} aria-label={stopped ? t("重新生成") : stopping ? result.error ? t("重试停止") : t("停止中") : t("停止")} className="!h-6 !min-w-12 !rounded-full !px-3">
                         {stopped ? <RotateCcw className="size-3" /> : stopping && !result.error ? <LoaderCircle className="size-3.5 animate-spin" /> : <Square className="size-3" fill="currentColor" />}
-                        {stopped ? "重新生成" : null}
+                        {stopped ? t("重新生成") : null}
                     </Button>
                 </div>
                 {progress !== null && !stopped ? (
                     <div className="absolute inset-x-4 bottom-4 z-10 flex flex-col gap-1">
                         <div className="flex items-center justify-between text-[10px] font-medium text-stone-500 dark:text-stone-400">
-                            <span>当前创作进度</span>
+                            <span>{t("当前创作进度")}</span>
                             <span>{progress}%</span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
@@ -2090,7 +2342,7 @@ function PendingVideoCard({ result, now, onCopyPrompt, onStop, onRetry, onDelete
                         </div>
                     </div>
                 ) : null}
-                {stopped || stopping && result.error ? <Button size="small" type="text" danger title="删除" className="!absolute right-1.5 top-1.5 z-10 !h-6 !w-6 !p-0" icon={<Trash2 className="size-3.5" />} onClick={onDelete} /> : null}
+                {stopped || stopping && result.error ? <Button size="small" type="text" danger title={t("删除")} className="!absolute right-1.5 top-1.5 z-10 !h-6 !w-6 !p-0" icon={<Trash2 className="size-3.5" />} onClick={onDelete} /> : null}
             </div>
             <TaskInfo item={{ ...result, durationMs }} onCopyPrompt={onCopyPrompt} />
         </div>
@@ -2105,20 +2357,20 @@ function FailedVideoCard({ result, error, onCopyPrompt, onPreview, onRetry }: { 
             <div className="relative flex aspect-video flex-col items-center justify-center gap-3 p-5 text-center">
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
                 <AlertCircle className="size-7 text-red-500" />
-                <div className="text-sm font-medium text-red-600 dark:text-red-300">生成失败</div>
+                <div className="text-sm font-medium text-red-600 dark:text-red-300">{t("生成失败")}</div>
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
                     {error}
                 </Typography.Paragraph>
             </div>
             <TaskInfo item={result} error={error} onCopyPrompt={onCopyPrompt} />
             <div className="flex justify-between gap-2 border-t border-red-200 p-3 dark:border-red-950">
-                <Button size="small" onClick={onPreview}>载入</Button>
+                <Button size="small" onClick={onPreview}>{t("载入")}</Button>
                 <div className="flex gap-2">
-                    <Button size="small" onClick={() => setDetailOpen(true)}>详情</Button>
-                    <Button size="small" danger onClick={onRetry}>重试</Button>
+                    <Button size="small" onClick={() => setDetailOpen(true)}>{t("详情")}</Button>
+                    <Button size="small" danger onClick={onRetry}>{t("重试")}</Button>
                 </div>
             </div>
-            <Modal title="失败详情" open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
+            <Modal title={t("失败详情")} open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
                 <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{detail}</pre>
             </Modal>
         </div>
@@ -2133,20 +2385,20 @@ function HistoryLogCard({ log, index, selected, active, syncing, onSelectedChang
             <div className="relative aspect-video bg-stone-100 dark:bg-stone-900">
                 <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded-md bg-white/85 px-1.5 py-1 shadow-sm dark:bg-stone-950/80">
                     <Checkbox checked={selected} onChange={(event) => onSelectedChange(event.target.checked)} />
-                    <Button size="small" type="text" danger title="删除" className="!h-6 !w-6 !p-0" icon={<Trash2 className="size-3.5" />} onClick={onDelete} />
+                    <Button size="small" type="text" danger title={t("删除")} className="!h-6 !w-6 !p-0" icon={<Trash2 className="size-3.5" />} onClick={onDelete} />
                 </div>
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
                     {log.video ? <VideoSourceTag video={log.video} /> : null}
-                    <Tag className="m-0 text-[10px]" color={log.status === "成功" ? "blue" : log.status === "生成中" || log.status === "停止中" ? "processing" : log.status === "已停止" ? undefined : "red"}>{log.status}</Tag>
+                    <Tag className="m-0 text-[10px]" color={log.status === "成功" ? "blue" : log.status === "生成中" || log.status === "停止中" ? "processing" : log.status === "已停止" ? undefined : "red"}>{t(log.status)}</Tag>
                 </div>
-                {log.video ? <video src={log.video.url} controls className="size-full bg-black object-contain" /> : log.status === "已停止" ? <div className="flex size-full flex-col items-center justify-center gap-2 text-sm"><Square className="size-7" /><span>已停止</span></div> : <div className="flex size-full flex-col items-center justify-center gap-2 p-5 text-center text-sm text-red-500"><AlertCircle className="size-7" /><span>{log.error || "没有可显示的视频"}</span></div>}
+                {log.video ? <video src={log.video.url} controls className="size-full bg-black object-contain" /> : log.status === "已停止" ? <div className="flex size-full flex-col items-center justify-center gap-2 text-sm"><Square className="size-7" /><span>{t("已停止")}</span></div> : <div className="flex size-full flex-col items-center justify-center gap-2 p-5 text-center text-sm text-red-500"><AlertCircle className="size-7" /><span>{log.error || t("没有可显示的视频")}</span></div>}
                 <ReferenceThumbnailOverlay references={log.references} className="bottom-1.5 right-1.5" />
             </div>
             <div className="space-y-2 border-t border-stone-200 p-2.5 text-xs dark:border-stone-800">
                 <div className={`${expanded ? "" : "line-clamp-2"} whitespace-pre-wrap text-stone-700 dark:text-stone-200`}>{log.prompt}</div>
                 <div className="flex items-center justify-end gap-1">
-                    <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => void onCopyPrompt(log.prompt)}>复制</Button>
-                    <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => setExpanded((value) => !value)}>{expanded ? "收起" : "展开"}</Button>
+                    <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => void onCopyPrompt(log.prompt)}>{t("复制")}</Button>
+                    <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => setExpanded((value) => !value)}>{expanded ? t("收起") : t("展开")}</Button>
                 </div>
                 <div className="flex flex-wrap gap-1">
                     <Tag className="m-0 text-[10px]">{formatLogTime(log.createdAt)}</Tag>
@@ -2154,20 +2406,20 @@ function HistoryLogCard({ log, index, selected, active, syncing, onSelectedChang
                     <Tag className="m-0 text-[10px]">{log.size}</Tag>
                     <Tag className="m-0 text-[10px]">{log.resolution}p</Tag>
                     <Tag className="m-0 text-[10px]">{log.seconds}s</Tag>
-                    <Tag className="m-0 text-[10px]">数量 {log.taskCount || 1}</Tag>
+                    <Tag className="m-0 text-[10px]">{t("数量")} {log.taskCount || 1}</Tag>
                     <Tag className="m-0 text-[10px]">{formatDuration(log.durationMs)}</Tag>
                 </div>
-                {log.error ? <div className="flex items-start justify-between gap-2 rounded-md bg-red-100 px-2 py-1 text-red-600 dark:bg-red-950/40 dark:text-red-300"><span className="line-clamp-2 min-w-0">{log.error}</span><Button size="small" type="text" className="!h-auto !p-0 text-xs" onClick={() => setDetailOpen(true)}>详情</Button></div> : null}
+                {log.error ? <div className="flex items-start justify-between gap-2 rounded-md bg-red-100 px-2 py-1 text-red-600 dark:bg-red-950/40 dark:text-red-300"><span className="line-clamp-2 min-w-0">{log.error}</span><Button size="small" type="text" className="!h-auto !p-0 text-xs" onClick={() => setDetailOpen(true)}>{t("详情")}</Button></div> : null}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-t border-stone-200 px-2.5 py-2 dark:border-stone-800">
                 <div className="flex flex-wrap gap-1">
-                    <Button size="small" onClick={onPreview}>载入</Button>
-                    <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={onRetry}>重试</Button>
+                    <Button size="small" onClick={onPreview}>{t("载入")}</Button>
+                    <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={onRetry}>{t("重试")}</Button>
                 </div>
-                {log.video ? <div className="flex shrink-0 gap-1"><Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(log.video)} onClick={() => onSync(log.video!)} /><Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveAsset(log.video!)} /><Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(log.video!)} /></div> : null}
+                {log.video ? <div className="flex shrink-0 gap-1"><Button size="small" title={t("同步到云端存储")} icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(log.video)} onClick={() => onSync(log.video!)} /><Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveAsset(log.video!)} /><Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(log.video!)} /></div> : null}
             </div>
-            <Modal title="失败详情" open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
-                <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{log.errorDetail || log.error || "没有详情"}</pre>
+            <Modal title={t("失败详情")} open={detailOpen} width={760} onCancel={() => setDetailOpen(false)} footer={null}>
+                <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-stone-950 p-3 text-xs text-stone-100">{log.errorDetail || log.error || t("没有详情")}</pre>
             </Modal>
         </div>
     );
@@ -2178,11 +2430,11 @@ function VideoMetaBar({ video, syncing, onDownload, onSync, onSaveAsset }: { vid
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-t border-stone-200 px-2.5 py-2 dark:border-stone-800">
             <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-1 text-[10px] text-stone-500 dark:text-stone-400">
                 <span>{video.width}x{video.height}</span>
-                {video.bytes ? <span>{formatBytes(video.bytes)}</span> : <span>远端地址</span>}
+                {video.bytes ? <span>{formatBytes(video.bytes)}</span> : <span>{t("远端地址")}</span>}
                 <span>{formatDuration(video.durationMs)}</span>
             </div>
             <div className="flex shrink-0 gap-1">
-                <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(video)} onClick={() => onSync(video)} />
+                <Button size="small" title={t("同步到云端存储")} icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(video)} onClick={() => onSync(video)} />
                 <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveAsset(video)} />
                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(video)} />
             </div>
@@ -2191,7 +2443,7 @@ function VideoMetaBar({ video, syncing, onDownload, onSync, onSaveAsset }: { vid
 }
 
 function VideoSourceTag({ video }: { video: GeneratedVideo }) {
-    return <Tag className="m-0 text-[10px]" color={video.storageKey ? "default" : "gold"}>{video.storageKey ? "本地缓存" : "AI 临时URL"}</Tag>;
+    return <Tag className="m-0 text-[10px]" color={video.storageKey ? "default" : "gold"}>{video.storageKey ? t("本地缓存") : t("AI 临时URL")}</Tag>;
 }
 
 function TaskInfo({ item, error, onCopyPrompt }: { item: GenerationResult; error?: string; onCopyPrompt: (text: string) => void | Promise<void> }) {
@@ -2201,8 +2453,8 @@ function TaskInfo({ item, error, onCopyPrompt }: { item: GenerationResult; error
             <div className="rounded-md bg-stone-50 p-2 dark:bg-stone-900">
                 <div className={`${expanded ? "" : "line-clamp-2"} whitespace-pre-wrap text-stone-700 dark:text-stone-200`}>{item.prompt}</div>
                 <div className="mt-2 flex justify-end gap-1">
-                    <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => void onCopyPrompt(item.prompt)}>复制</Button>
-                    <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => setExpanded((value) => !value)}>{expanded ? "收起" : "展开"}</Button>
+                    <Button size="small" type="text" icon={<Copy className="size-3.5" />} onClick={() => void onCopyPrompt(item.prompt)}>{t("复制")}</Button>
+                    <Button size="small" type="text" icon={expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} onClick={() => setExpanded((value) => !value)}>{expanded ? t("收起") : t("展开")}</Button>
                 </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -2211,7 +2463,7 @@ function TaskInfo({ item, error, onCopyPrompt }: { item: GenerationResult; error
                 <Tag className="m-0">{item.config.size || "auto"}</Tag>
                 <Tag className="m-0">{item.config.vquality || "720"}p</Tag>
                 <Tag className="m-0">{item.config.videoSeconds || "6"}s</Tag>
-                <Tag className="m-0">数量 {item.taskCount || 1}</Tag>
+                <Tag className="m-0">{t("数量")} {item.taskCount || 1}</Tag>
                 {item.durationMs ? <Tag className="m-0">{formatDuration(item.durationMs)}</Tag> : null}
             </div>
             {error ? <div className="rounded-md bg-red-100 px-2 py-1.5 text-red-600 dark:bg-red-950/40 dark:text-red-300">{error}</div> : null}
@@ -2300,7 +2552,7 @@ function buildDisplayConfig(config: AiConfig, model: string): GenerationLogConfi
 
 async function copyPrompt(text: string, success: (content: string) => void) {
     await navigator.clipboard.writeText(text);
-    success("提示词已复制");
+    success(t("提示词已复制"));
 }
 
 function formatLogTime(value: number) {
@@ -2442,7 +2694,7 @@ function backendTaskToLog(task: VideoResponse, fallbackConfig: AiConfig): Genera
     return {
         id: `backend-${videoTaskIdentityKeys(task)[0] || nanoid()}`,
         createdAt,
-        title: (request.prompt || model || "视频任务").slice(0, 12) || "视频任务",
+        title: (request.prompt || model || t("视频任务")).slice(0, 12) || t("视频任务"),
         prompt: request.prompt || "",
         time: new Date(createdAt).toLocaleString("zh-CN", { hour12: false }),
         model,
@@ -2461,8 +2713,8 @@ function backendTaskToLog(task: VideoResponse, fallbackConfig: AiConfig): Genera
         status,
         task,
         video,
-        error: status === "失败" ? task.error?.message || "视频生成失败" : undefined,
-        errorDetail: status === "失败" ? errorDetail(new VideoRequestError(task.error?.message || "视频生成失败", task)) : undefined,
+        error: status === "失败" ? task.error?.message || t("视频生成失败") : undefined,
+        errorDetail: status === "失败" ? errorDetail(new VideoRequestError(task.error?.message || t("视频生成失败"), task)) : undefined,
         lastPolledAt: Date.now(),
     };
 }
@@ -2739,7 +2991,7 @@ function isCloudVideo(video: GeneratedVideo) {
 }
 
 function errorMessage(error: unknown) {
-    return error instanceof Error ? error.message : "生成失败";
+    return error instanceof Error ? error.message : t("生成失败");
 }
 
 function errorDetail(error: unknown) {
@@ -2748,7 +3000,7 @@ function errorDetail(error: unknown) {
     try {
         return JSON.stringify(error, null, 2);
     } catch {
-        return String(error || "生成失败");
+        return String(error || t("生成失败"));
     }
 }
 
@@ -2820,7 +3072,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
     return {
         id: log.id || nanoid(),
         createdAt: log.createdAt || Date.now(),
-        title: log.title || log.model || "未命名",
+        title: log.title || log.model || t("未命名"),
         prompt: log.prompt || "",
         time: log.time || new Date().toLocaleString("zh-CN", { hour12: false }),
         model: log.model || config.videoModel || "",
@@ -2947,7 +3199,7 @@ function buildLog({ prompt, model, config, references, firstFrame, lastFrame, vi
     return {
         id: nanoid(),
         createdAt: Date.now(),
-        title: prompt.slice(0, 12) || "未命名",
+        title: prompt.slice(0, 12) || t("未命名"),
         prompt,
         time: new Date().toLocaleString("zh-CN", { hour12: false }),
         model,
@@ -3063,17 +3315,10 @@ function videoChannelProtocol(config: AiConfig, model: string) {
     return channel?.protocol || "openai";
 }
 
-const characterOrientationOptions = [{ value: "image", label: "图片" }, { value: "video", label: "视频" }];
+const characterOrientationOptions = [{ value: "image", get label() { return t("图片"); } }, { value: "video", get label() { return t("视频"); } }];
 
 function normalizeCharacterOrientation(value: string | undefined) {
     return value === "image" ? "image" : "video";
-}
-
-function klingBottomSizeValue(value: string) {
-    const normalized = String(value || "").trim().toLowerCase();
-    if (["9:16", "720x1280", "1080x1920"].includes(normalized)) return "9:16";
-    if (["1024x1024", "1080x1080"].includes(normalized)) return "1:1";
-    return "16:9";
 }
 
 function normalizeKlingV26Ratio(value: string) {
@@ -3098,9 +3343,9 @@ function activeKlingElements(value: VideoElementItem[] | undefined) {
 
 function validateKlingElementList(value: VideoElementItem[] | undefined) {
     for (const item of activeKlingElements(value)) {
-        if (!item.name.trim()) return "请填写元素名称";
-        if (!item.description.trim()) return "请填写元素描述";
-        if (item.references.length < 2 || item.references.length > 4) return "元素资源数量需要 2-4 个";
+        if (!item.name.trim()) return t("请填写元素名称");
+        if (!item.description.trim()) return t("请填写元素描述");
+        if (item.references.length < 2 || item.references.length > 4) return t("元素资源数量需要 2-4 个");
     }
     return "";
 }

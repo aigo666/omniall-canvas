@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { javascriptLanguage } from "@codemirror/lang-javascript";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { App, Button, Collapse, Modal, Space, Typography, theme } from "antd";
@@ -62,7 +63,7 @@ export function ChannelParameterTranslationEditor({ name, baseUrl, models, value
             onSave(draft.trim());
             close();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "配置校验失败");
+            message.error(error instanceof Error ? error.message : t("配置校验失败"));
         } finally {
             setSaving(false);
         }
@@ -80,46 +81,48 @@ export function ChannelParameterTranslationEditor({ name, baseUrl, models, value
         >
             <div className="flex h-dvh flex-col overflow-hidden" style={{ color: token.colorText, background: token.colorBgContainer }}>
                 <header className="shrink-0 border-b border-[var(--ant-color-border-secondary)] px-6 py-3 pr-14">
-                    <div className="text-base font-semibold">{name || "当前渠道"} · 自定传参转译</div>
+                    <div className="text-base font-semibold">{name || t("当前渠道")}  {t("· 自定传参转译")}</div>
                     <Typography.Text type="secondary" className="text-xs">
-                        空配置使用默认调用；填写后对应模型优先使用。编辑内容随渠道保存生效。
+                        
+                        {t("空配置使用默认调用；填写后对应模型优先使用。编辑内容随渠道保存生效。")}
                     </Typography.Text>
                 </header>
                 <div className="flex min-h-0 flex-1 overflow-hidden">
                     <aside className="flex h-full w-[420px] shrink-0 flex-col border-r border-stone-200 bg-stone-50/80 dark:border-stone-800 dark:bg-stone-900/40">
                         <div className="flex shrink-0 gap-2 border-b border-stone-200/70 px-5 py-3 text-xs text-stone-500 dark:border-stone-800/70 dark:text-stone-400">
-                            <span>1. 看懂规则</span><span>→</span><span>2. 让外部 AI 写</span><span>→</span><span>3. 粘贴保存</span>
+                            <span>{t("1. 看懂规则")}</span><span>→</span><span>{t("2. 让外部 AI 写")}</span><span>→</span><span>{t("3. 粘贴保存")}</span>
                         </div>
                         <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-0">
                             <section className="border-b border-stone-200/70 px-5 py-4 dark:border-stone-800/70">
-                                <StepHeading index={1} title="看懂规则" />
+                                <StepHeading index={1} title={t("看懂规则")} />
                                 <p className="text-xs leading-5 text-stone-600 dark:text-stone-300">{translationRuleHint}</p>
                                 <div className="mt-3">
-                                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-400">返回要求</div>
+                                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-400">{t("返回要求")}</div>
                                     <div className="text-xs leading-6 text-stone-600 dark:text-stone-300">{translationResultHint}</div>
                                 </div>
                             </section>
                             <section className="border-b border-stone-200/70 px-5 py-4 dark:border-stone-800/70">
-                                <StepHeading index={2} title="让外部 AI 写" />
+                                <StepHeading index={2} title={t("让外部 AI 写")} />
                                 <ol className="list-decimal space-y-1.5 pl-4 text-xs leading-5 text-stone-600 dark:text-stone-300">
-                                    <li>点击下方按钮，复制本页的变量、返回要求和写法说明。</li>
-                                    <li>打开 ChatGPT、Claude 或其他 AI，先粘贴说明，再附上你要对接的接口文档。</li>
-                                    <li>把 AI 返回的配置粘贴到右侧编辑器，确认后保存。</li>
+                                    <li>{t("点击下方按钮，复制本页的变量、返回要求和写法说明。")}</li>
+                                    <li>{t("打开 ChatGPT、Claude 或其他 AI，先粘贴说明，再附上你要对接的接口文档。")}</li>
+                                    <li>{t("把 AI 返回的配置粘贴到右侧编辑器，确认后保存。")}</li>
                                 </ol>
-                                <p className="mt-2 text-[11px] leading-5 text-stone-400">复制内容包含当前渠道地址、已选模型列表、返回要求、全部可用变量、配置字段和写法约束；密钥使用渠道现有设置。</p>
-                                <Button type="primary" className="mt-3" icon={<Copy className="size-3.5" />} onClick={() => copyText(translationAuthoringPrompt(models, baseUrl), "配置说明已复制，请到你的 AI 里粘贴")}>
-                                    复制配置说明
+                                <p className="mt-2 text-[11px] leading-5 text-stone-400">{t("复制内容包含当前渠道地址、已选模型列表、返回要求、全部可用变量、配置字段和写法约束；密钥使用渠道现有设置。")}</p>
+                                <Button type="primary" className="mt-3" icon={<Copy className="size-3.5" />} onClick={() => copyText(translationAuthoringPrompt(models, baseUrl), t("配置说明已复制，请到你的 AI 里粘贴"))}>
+                                    
+                                    {t("复制配置说明")}
                                 </Button>
                             </section>
                             <section className="px-5 py-4">
-                                <StepHeading index={3} title="可用变量" />
+                                <StepHeading index={3} title={t("可用变量")} />
                                 <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-xs leading-5 text-stone-500 dark:text-stone-400">点击变量名插入到右侧编辑器。</p>
-                                    <span className="shrink-0 text-[10px] text-stone-400">点击插入</span>
+                                    <p className="text-xs leading-5 text-stone-500 dark:text-stone-400">{t("点击变量名插入到右侧编辑器。")}</p>
+                                    <span className="shrink-0 text-[10px] text-stone-400">{t("点击插入")}</span>
                                 </div>
-                                <div className="mb-2 text-base font-semibold">通用变量</div>
+                                <div className="mb-2 text-base font-semibold">{t("通用变量")}</div>
                                 {variables(translationVariableGroups.common)}
-                                <div className="mb-2 mt-4 text-base font-semibold">请求、结果与任务查询</div>
+                                <div className="mb-2 mt-4 text-base font-semibold">{t("请求、结果与任务查询")}</div>
                                 <div className="space-y-1.5">{translationConfigItems.map(([label, code, description]) => item(label, code, description))}</div>
                             </section>
                             <Collapse
@@ -138,8 +141,8 @@ export function ChannelParameterTranslationEditor({ name, baseUrl, models, value
                     </aside>
                     <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex shrink-0 justify-between border-b border-[var(--ant-color-border-secondary)] px-4 py-3 text-xs">
-                            <span>渠道配置</span>
-                            <Typography.Text type="secondary">{draft.trim() ? "已填写自定义配置" : "默认调用"}</Typography.Text>
+                            <span>{t("渠道配置")}</span>
+                            <Typography.Text type="secondary">{draft.trim() ? t("已填写自定义配置") : t("默认调用")}</Typography.Text>
                         </div>
                         <CodeMirror
                             value={draft}
@@ -151,7 +154,7 @@ export function ChannelParameterTranslationEditor({ name, baseUrl, models, value
                             theme={dark ? "dark" : "light"}
                             extensions={editorExtensions}
                             basicSetup={{ autocompletion: false }}
-                            placeholder="留空使用系统默认调用，或点击下方插入渠道模板"
+                            placeholder={t("留空使用系统默认调用，或点击下方插入渠道模板")}
                             className="min-h-0 flex-1 [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto"
                             style={{ fontSize: 13 }}
                         />
@@ -160,16 +163,19 @@ export function ChannelParameterTranslationEditor({ name, baseUrl, models, value
                 <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--ant-color-border-secondary)] px-6 py-3">
                     <Space wrap>
                         <Button size="small" onClick={() => insert(translationTemplate(models[0]))}>
-                            插入渠道模板
+                            
+                            {t("插入渠道模板")}
                         </Button>
                         <Button size="small" danger onClick={() => setDraft("")}>
-                            恢复默认调用
+                            
+                            {t("恢复默认调用")}
                         </Button>
                     </Space>
                     <Space>
-                        <Button onClick={close}>取消</Button>
+                        <Button onClick={close}>{t("取消")}</Button>
                         <Button type="primary" loading={saving} onClick={() => void save()}>
-                            保存
+                            
+                            {t("保存")}
                         </Button>
                     </Space>
                 </footer>

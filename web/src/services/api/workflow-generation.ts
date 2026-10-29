@@ -2,6 +2,7 @@ import { readFileAsDataUrl } from "@/lib/image-utils";
 import type { WorkflowCapability, WorkflowRef } from "@/lib/workflow-channel";
 import { useConfigStore } from "@/stores/use-config-store";
 
+import { t } from "@/i18n";
 export type WorkflowRunInput = {
     ref: WorkflowRef;
     expectedCapability: WorkflowCapability;
@@ -82,7 +83,7 @@ async function workflowRequest<T>(path: string, token: string, signal?: AbortSig
         throw new WorkflowRequestError("工作流响应格式无效", response.status, isRetryableWorkflowStatus(response.status));
     }
     if (!response.ok || result.code !== 0) {
-        throw new WorkflowRequestError(result.msg || "工作流请求失败", response.status, !response.ok && isRetryableWorkflowStatus(response.status));
+        throw new WorkflowRequestError(result.msg || t("工作流请求失败"), response.status, !response.ok && isRetryableWorkflowStatus(response.status));
     }
     return result.data;
 }
@@ -120,7 +121,7 @@ export async function runWorkflowTask(token: string, input: WorkflowRunInput, si
         task = await getWorkflowTask(token, task.id, signal);
         onUpdate?.(task);
     }
-    if (task.status === "failed") throw new WorkflowRequestError(task.error || "工作流运行失败");
+    if (task.status === "failed") throw new WorkflowRequestError(task.error || t("工作流运行失败"));
     return task;
 }
 
@@ -129,7 +130,7 @@ export async function workflowMediaSource(url: string, ref?: WorkflowRef, provid
     const protocol = provider || (ref?.scope === "system" ? config.publicChannels : config.localChannels).find((channel) => channel.id === ref?.channelId)?.protocol;
     const comfyVideo = Boolean(ref && protocol === "comfyui");
     if (/^https:\/\//i.test(url) || !comfyVideo && url.startsWith("data:")) return url;
-    if (!url) throw new Error("工作流素材地址为空");
+    if (!url) throw new Error(t("工作流素材地址为空"));
     const response = await fetch(url);
     if (!response.ok) throw new Error(`读取工作流素材失败：${response.status}`);
     const blob = await response.blob();

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { Copy, Download, PencilLine, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Button, Card, Drawer, Empty, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
@@ -13,11 +14,11 @@ import { exportAssets, readAssetPackage } from "./asset-transfer";
 import { AssetFormModal } from "@/components/assets/asset-form-modal";
 
 const kindOptions = [
-    { label: "全部", value: "all" },
-    { label: "文本", value: "text" },
-    { label: "图片", value: "image" },
-    { label: "视频", value: "video" },
-    { label: "音频", value: "audio" },
+    { get label() { return t("全部"); }, value: "all" },
+    { get label() { return t("文本"); }, value: "text" },
+    { get label() { return t("图片"); }, value: "image" },
+    { get label() { return t("视频"); }, value: "video" },
+    { get label() { return t("音频"); }, value: "audio" },
 ];
 
 export default function AssetsPage() {
@@ -74,7 +75,7 @@ export default function AssetsPage() {
 
     const copyAssetText = async (asset: Asset) => {
         if (asset.kind !== "text") return;
-        copyText(asset.data.content, "文本已复制");
+        copyText(asset.data.content, t("文本已复制"));
     };
 
     const downloadAsset = (asset: Asset) => {
@@ -85,7 +86,7 @@ export default function AssetsPage() {
 
     const exportAllAssets = async () => {
         if (!validAssets.length) {
-            message.warning("暂无素材可导出");
+            message.warning(t("暂无素材可导出"));
             return;
         }
         await exportAssets(validAssets);
@@ -104,7 +105,7 @@ export default function AssetsPage() {
             });
             message.success(`已导入 ${importedAssets.length} 个素材`);
         } catch {
-            message.error("导入失败，请选择有效的素材压缩包");
+            message.error(t("导入失败，请选择有效的素材压缩包"));
         } finally {
             if (assetInputRef.current) assetInputRef.current.value = "";
         }
@@ -113,7 +114,7 @@ export default function AssetsPage() {
     const confirmDelete = () => {
         if (!deletingAsset) return;
         removeAsset(deletingAsset.id);
-        message.success("素材已删除");
+        message.success(t("素材已删除"));
         setDeletingAsset(null);
     };
 
@@ -122,8 +123,8 @@ export default function AssetsPage() {
             <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-8 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.14)_1px,transparent_1px)]">
                 <div className="pb-8">
                     <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">我的素材</h1>
-                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">收藏和管理常用素材，按类型、标题、分类和标签快速查找。</p>
+                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">{t("我的素材")}</h1>
+                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">{t("收藏和管理常用素材，按类型、标题、分类和标签快速查找。")}</p>
                     </div>
 
                     <div className="mx-auto mt-8 w-full max-w-2xl">
@@ -133,7 +134,7 @@ export default function AssetsPage() {
                             allowClear
                             prefix={<Search className="size-4 text-stone-400" />}
                             value={keyword}
-                            placeholder="搜索标题、内容、分类、标签或来源"
+                            placeholder={t("搜索标题、内容、分类、标签或来源")}
                             onChange={(event) => {
                                 setPage(1);
                                 setKeyword(event.target.value);
@@ -148,7 +149,7 @@ export default function AssetsPage() {
                     <div className="mx-auto mt-6 grid max-w-6xl gap-3 text-left">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                                <div className="text-xs font-medium text-stone-500 dark:text-stone-400">类型</div>
+                                <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("类型")}</div>
                                 <div className="flex flex-wrap gap-2">
                                     {kindOptions.map((option) => (
                                         <Tag.CheckableTag
@@ -171,45 +172,49 @@ export default function AssetsPage() {
                                     className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
                                     onClick={() => void exportAllAssets()}
                                 >
-                                    导出素材
+                                    
+                                    {t("导出素材")}
                                 </button>
                                 <button
                                     type="button"
                                     className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
                                     onClick={() => assetInputRef.current?.click()}
                                 >
-                                    导入素材
+                                    
+                                    {t("导入素材")}
                                 </button>
                                 <button
                                     type="button"
                                     className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
                                     onClick={openCreate}
                                 >
-                                    新增素材
+                                    
+                                    {t("新增素材")}
                                 </button>
                             </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">分类</div>
+                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("分类")}</div>
                             <div className="thin-scrollbar flex max-h-[112px] flex-wrap gap-2 overflow-y-auto pr-1">
                                 {["", ...categories].map((category) => (
                                     <Tag.CheckableTag key={category || "all"} checked={categoryFilter === category} className={cn("prompt-filter-tag", categoryFilter === category && "is-active")} onChange={() => {
                                         setPage(1);
                                         setCategoryFilter(category);
                                     }}>
-                                        {category || "全部"}
+                                        {category || t("全部")}
                                     </Tag.CheckableTag>
                                 ))}
                             </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">标签</div>
+                            <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("标签")}</div>
                             <div className="thin-scrollbar flex max-h-[112px] flex-wrap gap-2 overflow-y-auto pr-1">
                                 <Tag.CheckableTag checked={tagFilters.length === 0} className={cn("prompt-filter-tag", tagFilters.length === 0 && "is-active")} onChange={() => {
                                     setPage(1);
                                     setTagFilters([]);
                                 }}>
-                                    全部
+                                    
+                                    {t("全部")}
                                 </Tag.CheckableTag>
                                 {tags.map((tag) => (
                                     <Tag.CheckableTag key={tag} checked={tagFilters.includes(tag)} className={cn("prompt-filter-tag", tagFilters.includes(tag) && "is-active")} onChange={() => {
@@ -231,7 +236,7 @@ export default function AssetsPage() {
                         ))}
                     </div>
 
-                    {!visibleAssets.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有找到素材" className="py-20" /> : null}
+                    {!visibleAssets.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("没有找到素材")} className="py-20" /> : null}
 
                     <div className="flex justify-center">
                         <Pagination
@@ -255,8 +260,9 @@ export default function AssetsPage() {
 
             <input ref={assetInputRef} type="file" accept="application/zip,.zip" className="hidden" onChange={(event) => void importAssetZip(event.target.files?.[0])} />
 
-            <Modal title="删除素材" open={Boolean(deletingAsset)} onCancel={() => setDeletingAsset(null)} onOk={confirmDelete} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
-                确定删除「{deletingAsset?.title}」吗？删除后会从我的素材中移除。
+            <Modal title={t("删除素材")} open={Boolean(deletingAsset)} onCancel={() => setDeletingAsset(null)} onOk={confirmDelete} okText={t("删除")} okButtonProps={{ danger: true }} cancelText={t("取消")}>
+                
+                {t("确定删除「")}{deletingAsset?.title}{t("」吗？删除后会从我的素材中移除。")}
             </Modal>
         </div>
     );
@@ -277,7 +283,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                     ) : asset.kind === "video" ? (
                         <video src={asset.data.url + "#t=0.1"} muted playsInline preload="metadata" className="aspect-[4/3] w-full object-cover" />
                     ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
+                        <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : t("暂无封面")}</div>
                     )}
                 </button>
             }
@@ -288,7 +294,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                         <div className="min-w-0">
                             <h2 className="line-clamp-1 text-sm font-semibold text-stone-950 dark:text-stone-100">{asset.title}</h2>
                             <Typography.Text type="secondary" className="mt-1 block text-xs">
-                                {asset.source || "未标注来源"}
+                                {asset.source || t("未标注来源")}
                             </Typography.Text>
                         </div>
                         <Tag className="m-0 shrink-0 text-[11px]">{assetKindLabel(asset.kind)}</Tag>
@@ -302,29 +308,34 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                                 {tag}
                             </Tag>
                         ))}
-                        {!asset.tags?.length ? <Tag className="m-0 text-[11px]">无标签</Tag> : null}
+                        {!asset.tags?.length ? <Tag className="m-0 text-[11px]">{t("无标签")}</Tag> : null}
                     </div>
                 </div>
             </button>
             <div className="flex items-center gap-2 px-4 pb-4">
                 <Button size="small" onClick={onOpen}>
-                    查看
+                    
+                    {t("查看")}
                 </Button>
                 <Button size="small" icon={<PencilLine className="size-3.5" />} onClick={onEdit}>
-                    编辑
+                    
+                    {t("编辑")}
                 </Button>
                 {asset.kind === "text" ? (
                     <Button size="small" icon={<Copy className="size-3.5" />} onClick={() => void onCopy(asset)}>
-                        复制
+                        
+                        {t("复制")}
                     </Button>
                 ) : null}
                 {asset.kind === "image" || asset.kind === "video" || asset.kind === "audio" ? (
                     <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(asset)}>
-                        下载
+                        
+                        {t("下载")}
                     </Button>
                 ) : null}
                 <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={onDelete}>
-                    删除
+                    
+                    {t("删除")}
                 </Button>
             </div>
         </Card>
@@ -334,13 +345,13 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
 function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | null; onClose: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void }) {
     const cover = asset ? asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "") : "";
     return (
-        <Drawer title="素材详情" open={Boolean(asset)} size="large" onClose={onClose}>
+        <Drawer title={t("素材详情")} open={Boolean(asset)} size="large" onClose={onClose}>
             {asset ? (
                 <div className="space-y-5">
                     {cover ? (
                         <Image src={cover} alt={asset.title} className="rounded-lg" />
                     ) : (
-                        <div className="rounded-lg border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
+                        <div className="rounded-lg border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : t("暂无封面")}</div>
                     )}
                     <div>
                         <Typography.Title level={4} className="!mb-2">
@@ -355,7 +366,8 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
                     </div>
                     <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-800">
                         <Typography.Text type="secondary" className="block text-xs">
-                            内容
+                            
+                            {t("内容")}
                         </Typography.Text>
                         {asset.kind === "text" ? (
                             <Typography.Paragraph className="mt-2 whitespace-pre-wrap">{asset.data.content}</Typography.Paragraph>
@@ -371,19 +383,20 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
                     </div>
                     {asset.category ? (
                         <div>
-                            <Typography.Text type="secondary">分类</Typography.Text>
+                            <Typography.Text type="secondary">{t("分类")}</Typography.Text>
                             <Typography.Paragraph className="mt-1">{asset.category}</Typography.Paragraph>
                         </div>
                     ) : null}
                     <Space>
                         {asset.kind === "text" ? (
                             <Button type="primary" icon={<Copy className="size-4" />} onClick={() => onCopy(asset)}>
-                                复制文本
+                                
+                                {t("复制文本")}
                             </Button>
                         ) : null}
                         {asset.kind === "image" || asset.kind === "video" || asset.kind === "audio" ? (
                             <Button type="primary" icon={<Download className="size-4" />} onClick={() => onDownload(asset)}>
-                                {asset.kind === "video" ? "下载视频" : asset.kind === "audio" ? "下载音频" : "下载图片"}
+                                {asset.kind === "video" ? t("下载视频") : asset.kind === "audio" ? t("下载音频") : t("下载图片")}
                             </Button>
                         ) : null}
                     </Space>
@@ -404,8 +417,8 @@ function assetSearchText(asset: Asset) {
 }
 
 function assetKindLabel(kind: AssetKind) {
-    if (kind === "image") return "图片";
-    if (kind === "video") return "视频";
-    if (kind === "audio") return "音频";
-    return "文本";
+    if (kind === "image") return t("图片");
+    if (kind === "video") return t("视频");
+    if (kind === "audio") return t("音频");
+    return t("文本");
 }

@@ -1,15 +1,15 @@
 "use client";
 
 import type { CSSProperties, RefObject } from "react";
-import { Avatar, Dropdown, Tooltip } from "antd";
+import { Avatar, Dropdown, Tooltip, type DropdownProps } from "antd";
 import { Keyboard, LogOut, Settings2, Shield } from "lucide-react";
 import type { ItemType } from "antd/es/menu/interface";
 import Link from "next/link";
 
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
-import { GitHubLink } from "@/components/layout/github-link";
+import { LocaleSwitch } from "@/components/layout/locale-switch";
 import { VersionReleaseModal } from "@/components/layout/version-release-modal";
 import { CreditSymbol } from "@/constant/credits";
+import { t, useLocale } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -24,11 +24,15 @@ type UserStatusActionsProps = {
     onAccountOpenChange?: (open: boolean) => void;
     accountRef?: RefObject<HTMLDivElement | null>;
     getPopupContainer?: (node: HTMLElement) => HTMLElement;
+    dropdownPlacement?: DropdownProps["placement"];
+    className?: string;
+    showVersion?: boolean;
+    loginVariant?: "link" | "pill";
 };
 
-export function UserStatusActions({ showConfig = true, variant = "default", onOpenShortcuts, accountOpen, onAccountOpenChange, accountRef, getPopupContainer }: UserStatusActionsProps) {
+export function UserStatusActions({ showConfig = true, variant = "default", onOpenShortcuts, accountOpen, onAccountOpenChange, accountRef, getPopupContainer, dropdownPlacement = "bottomRight", className, showVersion = true, loginVariant = "link" }: UserStatusActionsProps) {
+    useLocale();
     const theme = useThemeStore((state) => state.theme);
-    const setTheme = useThemeStore((state) => state.setTheme);
     const user = useUserStore((state) => state.user);
     const logout = useUserStore((state) => state.clearSession);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
@@ -40,29 +44,26 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
     const naturalIconClass = "inline-flex size-7 shrink-0 items-center justify-center text-stone-600 transition hover:text-stone-950 dark:text-stone-300 dark:hover:text-white [&_svg]:size-4";
     const iconStyle: CSSProperties | undefined = variant === "canvas" ? { color: canvasTheme.node.text } : undefined;
     const versionStyle = iconStyle;
-    const gitHubClassName = "size-7 text-base";
-    const gitHubStyle = iconStyle;
     const avatarStyle: CSSProperties | undefined = variant === "canvas" ? { borderColor: canvasTheme.toolbar.border, color: canvasTheme.node.text, background: "transparent" } : undefined;
     const menuItems: ItemType[] = [
         { key: "user", disabled: true, label: <span className="font-medium text-current">{userName}</span> },
-        ...(user?.role === "admin" ? [{ key: "admin", icon: <Shield className="size-4" />, label: <Link href="/admin">管理后台</Link> }] : []),
-        ...(onOpenShortcuts ? [{ key: "shortcuts", icon: <Keyboard className="size-4" />, label: "快捷键", onClick: onOpenShortcuts }] : []),
+        ...(user?.role === "admin" ? [{ key: "admin", icon: <Shield className="size-4" />, label: <Link href="/admin">{t("管理后台")}</Link> }] : []),
+        ...(onOpenShortcuts ? [{ key: "shortcuts", icon: <Keyboard className="size-4" />, label: t("快捷键"), onClick: onOpenShortcuts }] : []),
         { type: "divider" },
-        { key: "logout", icon: <LogOut className="size-4" />, label: "退出登录", onClick: logout },
+        { key: "logout", icon: <LogOut className="size-4" />, label: t("退出登录"), onClick: logout },
     ];
 
     return (
-        <div className="inline-flex shrink-0 items-center gap-1">
+        <div className={cn("inline-flex shrink-0 items-center gap-1", className)}>
+            <LocaleSwitch className={variant === "canvas" ? "mr-1" : undefined} inverted={variant === "canvas"} />
             {showConfig ? (
-                <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => openConfigDialog(false)} aria-label="配置" title="配置">
+                <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => openConfigDialog(false)} aria-label={t("配置")} title={t("配置")}>
                     <Settings2 className="size-4" />
                 </button>
             ) : null}
-            <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className={naturalIconClass} style={iconStyle} aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"} title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"} />
-            <VersionReleaseModal style={versionStyle} />
-            <GitHubLink className={cn("bg-transparent hover:bg-transparent dark:hover:bg-transparent", gitHubClassName)} style={gitHubStyle} />
+            {showVersion ? <VersionReleaseModal style={versionStyle} /> : null}
             {variant === "canvas" && user ? (
-                <Tooltip title="当前算力点余额" placement="bottom">
+                    <Tooltip title={t("当前算力点余额")} placement="bottom">
                     <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: canvasTheme.node.text }}>
                         <CreditSymbol className="text-sm leading-none" />
                         <span>{credits.toLocaleString()}</span>
@@ -70,19 +71,24 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
                 </Tooltip>
             ) : null}
             {!user && onOpenShortcuts ? (
-                <button type="button" className={naturalIconClass} style={iconStyle} onClick={onOpenShortcuts} aria-label="快捷键" title="快捷键">
+                <button type="button" className={naturalIconClass} style={iconStyle} onClick={onOpenShortcuts} aria-label={t("快捷键")} title={t("快捷键")}>
                     <Keyboard className="size-4" />
                 </button>
             ) : null}
-            {!user ? (
+            {!user && loginVariant === "pill" ? (
+                <Link href="/login" className="ml-1 inline-flex h-8 items-center rounded-full !bg-[#c8ff00] px-4 text-xs font-medium !text-[#0a0a0a] transition hover:!bg-[#d6ff33]">
+                    {t("注册 / 登录")}
+                </Link>
+            ) : null}
+            {!user && loginVariant === "link" ? (
                 <Link href="/login" className="px-1.5 text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-950 hover:underline dark:text-stone-300 dark:hover:text-stone-100" style={iconStyle}>
-                    登录
+                    {t("登录")}
                 </Link>
             ) : null}
             {user ? (
                 <div ref={accountRef}>
-                    <Dropdown open={accountOpen} onOpenChange={onAccountOpenChange} trigger={["click"]} placement="bottomRight" getPopupContainer={getPopupContainer} styles={{ root: { minWidth: 150 } }} menu={{ items: menuItems }}>
-                        <button type="button" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-transparent p-0 text-[0] leading-[0] transition" aria-label="账户菜单">
+                    <Dropdown open={accountOpen} onOpenChange={onAccountOpenChange} trigger={["click"]} placement={dropdownPlacement} getPopupContainer={getPopupContainer} styles={{ root: { minWidth: 150 } }} menu={{ items: menuItems }}>
+                        <button type="button" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-transparent p-0 text-[0] leading-[0] transition" aria-label={t("账户菜单")}>
                             <Avatar
                                 size={24}
                                 src={avatarUrl ? <img src={avatarUrl} alt={userName} referrerPolicy="no-referrer" /> : undefined}

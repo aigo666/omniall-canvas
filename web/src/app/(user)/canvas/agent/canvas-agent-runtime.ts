@@ -36,6 +36,7 @@ import {
     type CanvasAgentToolResult,
 } from "./canvas-agent-tools";
 
+import { t } from "@/i18n";
 const MAX_AGENT_STEPS = 12;
 
 export type CanvasAgentRuntimeEvent = {
@@ -94,7 +95,7 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
         { role: "user" as const, content: buildUserContent(input.userText, input.references, input.config.textModel || input.config.model) },
     ];
     let contextCheckpoint = input.contextCheckpoint;
-    const activeSkillContents = input.activeSkillContents?.map((skill, index) => `【完整 Skill ${index + 1}：${skill.name}（${skill.source === "system" ? `系统 Skill ID：${skill.id}` : "用户 Skill"}）】\n${skill.content}`).join("\n\n");
+    const activeSkillContents = input.activeSkillContents?.map((skill, index) => `【完整 Skill ${index + 1}：${skill.name}（${skill.source === "system" ? `系统 Skill ID：${skill.id}` : t("用户 Skill")}）】\n${skill.content}`).join("\n\n");
     const skillFileToolAvailable = Boolean(input.activeSkillContents?.some((skill) => skill.source === "system" && skill.hasFiles));
     const agentTools = skillFileToolAvailable ? [...CANVAS_AGENT_TOOLS, CANVAS_AGENT_SKILL_FILE_TOOL] : CANVAS_AGENT_TOOLS;
 
@@ -125,7 +126,7 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
 
     for (let step = 0; step < MAX_AGENT_STEPS; step++) {
         throwIfAborted(input.signal);
-        input.onEvent?.({ status: "thinking", label: step ? "正在根据画布结果继续" : "正在理解画布和创作目标" });
+        input.onEvent?.({ status: "thinking", label: step ? t("正在根据画布结果继续") : t("正在理解画布和创作目标") });
         const context = input.getContext(state);
         let systemPrompt = buildCanvasAgentSkillPrompt(state.phase, input.userText, context, activeSkillContents, contextCheckpoint, skillFileToolAvailable);
         const nativeTools = toolMode === "native";
@@ -175,26 +176,26 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
             try {
                 nativeActions = turn.toolCalls.map((toolCall) => normalizeCanvasAgentAction(toolCall.name, toolCall.arguments, toolCall.id));
             } catch (error) {
-                actionError = error instanceof Error ? error.message : "工具参数无效";
+                actionError = error instanceof Error ? error.message : t("工具参数无效");
             }
         }
         if (!actionError && expectedAction && !nativeActions.length && !parsedJson.actions.length) {
             actionError = "本轮必须返回可执行的画布工具指令";
         }
         if (actionError) {
-            if (protocolError) throw new Error("工具指令仍无效，本批操作未执行：" + actionError);
+            if (protocolError) throw new Error(t("工具指令仍无效，本批操作未执行：") + actionError);
             protocolError = actionError;
             const feedback = JSON.stringify({
                 ok: false,
                 code: "invalid_tool_arguments",
-                message: actionError + "。本批操作均未执行，未创建节点或提交生成。请按工具定义修正调用；JSON 模式只返回 actions 和 reply，所有工具参数放入 arguments，工具名不得含 Markdown 转义。只修正格式与参数位置，保留完整定稿、已确认总时长和来源引用，不得删减提示词或改用默认时长；不要声称已提交。",
+                message: actionError + t("。本批操作均未执行，未创建节点或提交生成。请按工具定义修正调用；JSON 模式只返回 actions 和 reply，所有工具参数放入 arguments，工具名不得含 Markdown 转义。只修正格式与参数位置，保留完整定稿、已确认总时长和来源引用，不得删减提示词或改用默认时长；不要声称已提交。"),
             });
             protocolMessages = [
                 ...protocolMessages,
                 ...(assistantToolMessage.content || assistantToolMessage.reasoningContent || assistantToolMessage.responseItems?.length || assistantToolMessage.toolCalls?.length ? [assistantToolMessage] : []),
                 ...(turn.toolCalls.length
                     ? turn.toolCalls.map((toolCall) => ({ role: "tool" as const, toolCallId: toolCall.id, name: toolCall.name, content: feedback }))
-                    : [{ role: "user" as const, content: "工具执行结果（只可依据这些真实结果继续）：\n" + feedback }]),
+                    : [{ role: "user" as const, content: t("工具执行结果（只可依据这些真实结果继续）：\n") + feedback }]),
             ];
             emitCheckpoint();
             step -= 1;
@@ -207,11 +208,11 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
             role: "tool",
             toolCallId: action.id,
             name: action.name,
-            content: JSON.stringify({ ok: false, code: "action_not_requested", message: "用户没有要求整理画布，未执行节点排列" }),
+            content: JSON.stringify({ ok: false, code: "action_not_requested", message: t("用户没有要求整理画布，未执行节点排列") }),
         }));
 
         if (!actions.length && protocolError) {
-            throw new Error("修正后仍未返回可执行的工具指令，本批操作未执行：" + protocolError);
+            throw new Error(t("修正后仍未返回可执行的工具指令，本批操作未执行：") + protocolError);
         }
 
         if (!actions.length && rejectedToolMessages.length) {
@@ -231,14 +232,14 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
                 protocolMessages = [...protocolMessages, { role: "assistant" as const, content: unsupported }];
                 return { reply: unsupported, state, protocolMessages: persistCanvasAgentProtocolMessages(protocolMessages), contextCheckpoint, jsonFallbackMode: usedJsonFallbackMode };
             }
-            const finalReply = reply || "我已经读取当前画布。请告诉我下一步要继续完善哪一部分。";
+            const finalReply = reply || t("我已经读取当前画布。请告诉我下一步要继续完善哪一部分。");
             protocolMessages = [...protocolMessages, { role: "assistant" as const, content: finalReply, ...(turn.responseItems?.length ? { responseItems: turn.responseItems } : {}) }];
             return { reply: finalReply, state, protocolMessages: persistCanvasAgentProtocolMessages(protocolMessages), contextCheckpoint, jsonFallbackMode: usedJsonFallbackMode };
         }
 
         expectedAction = false;
         protocolError = undefined;
-        input.onEvent?.({ status: "running", label: actions.length === 1 ? canvasAgentActionLabel(actions[0]) : "正在执行 " + actions.length + " 个画布操作" });
+        input.onEvent?.({ status: "running", label: actions.length === 1 ? canvasAgentActionLabel(actions[0]) : t("正在执行 ") + actions.length + t(" 个画布操作") });
 
         const results = await executeActions(actions, state, input.executeAction, input.signal, input.onEvent);
         hasExecutedActions = true;
@@ -262,7 +263,7 @@ export async function runCanvasAgent(input: RunCanvasAgentInput): Promise<RunCan
                 assistantToolMessage,
                 {
                     role: "user" as const,
-                    content: "工具执行结果（只可依据这些真实结果继续）：\n" + JSON.stringify(results.items.map(({ action, result }) => ({ tool: action.name, id: action.id, result }))),
+                    content: t("工具执行结果（只可依据这些真实结果继续）：\n") + JSON.stringify(results.items.map(({ action, result }) => ({ tool: action.name, id: action.id, result }))),
                 },
             ];
         }
@@ -300,7 +301,7 @@ export async function executeActions(
                 result: {
                     ok: false,
                     code: "tool_execution_failed",
-                    message: error instanceof Error ? error.message : "工具执行失败",
+                    message: error instanceof Error ? error.message : t("工具执行失败"),
                 } satisfies CanvasAgentToolResult,
             };
         }
@@ -317,10 +318,10 @@ export async function executeActions(
 
 function buildUserContent(text: string, references: CanvasAssistantReference[], modelName: string): CanvasAgentContent {
     const referenceText = references.length
-        ? "\n\n本次输入中的节点占位与真实节点一一对应，请按占位分别理解和操作：" + references.map((item) => `${item.label || item.title} → 节点 ${item.id}（${item.title}）`).join("；")
+        ? t("\n\n本次输入中的节点占位与真实节点一一对应，请按占位分别理解和操作：") + references.map((item) => `${item.label || item.title} → 节点 ${item.id}（${item.title}）`).join("；")
         : "";
     const imageReferences = references.filter((item) => item.dataUrl && (/^data:image\//.test(item.dataUrl) || /^https?:\/\//.test(item.dataUrl)));
-    const imageOrderText = imageReferences.length ? "\n随消息附带的图片顺序：" + imageReferences.map((item, index) => `第 ${index + 1} 张 = ${item.label || item.title}`).join("；") : "";
+    const imageOrderText = imageReferences.length ? t("\n随消息附带的图片顺序：") + imageReferences.map((item, index) => `第 ${index + 1} 张 = ${item.label || item.title}`).join("；") : "";
     const images = supportsCanvasAgentImageInput(modelName)
         ? imageReferences.map((item) => ({ type: "image_url" as const, image_url: { url: item.dataUrl as string } }))
         : [];
@@ -341,7 +342,7 @@ function persistCanvasAgentProtocolMessages(messages: CanvasAgentProtocolMessage
                 .map((item) => item.text)
                 .join("\n")
                 .trim();
-            return { role: message.role, content: text || "本轮包含图片引用；媒体内容未写入会话记录。" };
+            return { role: message.role, content: text || t("本轮包含图片引用；媒体内容未写入会话记录。") };
         }
         return message;
     });
@@ -373,7 +374,7 @@ function applyTaskResult(state: CanvasAgentState, result: CanvasAgentToolResult)
 
 function throwIfAborted(signal?: AbortSignal) {
     if (!signal?.aborted) return;
-    const error = new Error("Agent 已停止");
+    const error = new Error(t("Agent 已停止"));
     error.name = "AbortError";
     throw error;
 }

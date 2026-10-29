@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "https://agent.omniall.ai",
+  "port": 17890,
+  "host": "127.0.0.1",
+  "agentPort": 3210
+}

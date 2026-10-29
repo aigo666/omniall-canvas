@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import localforage from "localforage";
 
 import { nanoid } from "nanoid";
@@ -181,7 +183,7 @@ export async function uploadImage(input: string | Blob, options: UploadImageOpti
         const contentType = response.headers.get("content-type") || "";
         if (contentType.includes("application/json")) {
             const payload = await response.json().catch(() => null) as { msg?: string } | null;
-            throw new Error(payload?.msg || "代理图片下载失败");
+            throw new Error(payload?.msg || t("代理图片下载失败"));
         }
         blob = await response.blob();
     } else {
@@ -203,19 +205,19 @@ export async function uploadRemoteImageToServer(url: string, filename: string): 
     const response = await fetch(getProxyUrl(url));
     if (!response.ok) {
         const payload = await response.json().catch(() => null) as { msg?: string } | null;
-        throw new Error(payload?.msg || "代理图片拉取失败：" + response.status);
+        throw new Error(payload?.msg || t("代理图片拉取失败：") + response.status);
     }
     const blob = await response.blob();
     const config = await loadStorageConfig();
     const userProvider = config.allowUserProvider ? loadUserStorageProvider() : null;
-    if (!canUseGlobalStorage(config) && !userProvider) throw new Error("服务端对象存储未启用");
+    if (!canUseGlobalStorage(config) && !userProvider) throw new Error(t("服务端对象存储未启用"));
     const token = useUserStore.getState().token;
     if (userProvider?.type === "webdav") {
         const directUpload = await uploadWebDAVImageDirect(blob, filename || `image-${nanoid()}.${imageExtension(blob.type)}`, userProvider);
         if (directUpload) return directUpload;
     }
     if (!token) {
-        if (!userProvider) throw new Error("服务端存储需要先登录");
+        if (!userProvider) throw new Error(t("服务端存储需要先登录"));
         const uploaded = await uploadAnonymousStorageFile<UploadedImage>(blob, filename || "image-" + nanoid() + "." + imageExtension(blob.type), toProviderPayload(userProvider));
         return cacheAnonymousImage(uploaded, blob);
     }
@@ -224,7 +226,7 @@ export async function uploadRemoteImageToServer(url: string, filename: string): 
     if (userProvider) formData.append("provider", JSON.stringify(toProviderPayload(userProvider)));
     const uploadResponse = await fetch("/api/v1/files", { method: "POST", headers: { Authorization: "Bearer " + token }, body: formData });
     const payload = (await uploadResponse.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedImage } | null;
-    if (!uploadResponse.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "服务端图片上传失败");
+    if (!uploadResponse.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || t("服务端图片上传失败"));
     const meta = await readImageMeta(payload.data.url);
     if (payload.data.storageKey?.startsWith("server:")) serverUrls.set(payload.data.storageKey.slice("server:".length), payload.data.url);
     return { ...payload.data, width: payload.data.width || meta.width, height: payload.data.height || meta.height, mimeType: payload.data.mimeType || blob.type || "image/png", bytes: payload.data.bytes || blob.size };
@@ -285,7 +287,7 @@ async function resolveLocalImageUrl(storageKey: string) {
 async function maybeUploadImageToServer(blob: Blob, tokenOverride?: string): Promise<UploadedImage | null> {
     const config = await loadStorageConfig().catch(() => null);
     if (tokenOverride !== undefined && useUserStore.getState().token !== tokenOverride) {
-        throw new Error("登录状态已变化");
+        throw new Error(t("登录状态已变化"));
     }
     const userProvider = config?.allowUserProvider ? loadUserStorageProvider() : null;
     const canUseGlobalProvider = config ? canUseGlobalStorage(config) : false;
@@ -298,7 +300,7 @@ async function maybeUploadImageToServer(blob: Blob, tokenOverride?: string): Pro
     }
     if (!token) {
         if (!userProvider) {
-            if (canUseGlobalProvider) throw new Error("服务端存储需要先登录");
+            if (canUseGlobalProvider) throw new Error(t("服务端存储需要先登录"));
             return null;
         }
         try {
@@ -315,7 +317,7 @@ async function maybeUploadImageToServer(blob: Blob, tokenOverride?: string): Pro
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedImage } | null;
     if (!response.ok || payload?.code !== 0 || !payload.data) {
         if (!canUseGlobalProvider) return null;
-        throw new Error(payload?.msg || "服务端图片上传失败");
+        throw new Error(payload?.msg || t("服务端图片上传失败"));
     }
     const meta = await readImageMeta(payload.data.url);
     if (payload.data.storageKey?.startsWith("server:")) serverUrls.set(payload.data.storageKey.slice("server:".length), payload.data.url);
@@ -389,10 +391,10 @@ export async function imageToDataUrl(image: { url?: string; dataUrl?: string; st
             }
             return blobToDataUrl(await response.blob());
         } catch (error) {
-            lastError = error instanceof Error ? error.message : "读取参考图失败";
+            lastError = error instanceof Error ? error.message : t("读取参考图失败");
         }
     }
-    throw new Error(lastError || "读取参考图失败");
+    throw new Error(lastError || t("读取参考图失败"));
 }
 
 export async function deleteStoredImages(keys: Iterable<string>, ownerToken?: string) {
@@ -580,7 +582,7 @@ async function deleteServerImage(storageKey: string) {
         body: JSON.stringify(provider ? { provider: toProviderPayload(provider) } : {}),
     });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null;
-    if (!response.ok || payload?.code !== 0) throw new Error(payload?.msg || "删除服务端图片失败");
+    if (!response.ok || payload?.code !== 0) throw new Error(payload?.msg || t("删除服务端图片失败"));
     clearAutoSyncCache(storageKey);
 }
 
@@ -588,7 +590,7 @@ function blobToDataUrl(blob: Blob) {
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("读取图片失败"));
+        reader.onerror = () => reject(new Error(t("读取图片失败")));
         reader.readAsDataURL(blob);
     });
 }

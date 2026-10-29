@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
@@ -31,10 +32,10 @@ export function useAdminAssets() {
         mutationFn: (asset: Partial<AdminAsset>) => saveAdminAsset(token, asset),
         onSuccess: async (_, asset) => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
-            message.success(asset.id ? "素材已保存" : "素材已新增");
+            message.success(asset.id ? t("素材已保存") : t("素材已新增"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "保存失败");
+            message.error(error instanceof Error ? error.message : t("保存失败"));
         },
     });
 
@@ -42,16 +43,16 @@ export function useAdminAssets() {
         mutationFn: (id: string) => deleteAdminAsset(token, id),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
-            message.success("素材已删除");
+            message.success(t("素材已删除"));
         },
         onError: (error) => {
-            message.error(error instanceof Error ? error.message : "删除失败");
+            message.error(error instanceof Error ? error.message : t("删除失败"));
         },
     });
 
     useEffect(() => {
         if (query.isError) {
-            const errorMessage = query.error instanceof Error ? query.error.message : "读取素材失败";
+            const errorMessage = query.error instanceof Error ? query.error.message : t("读取素材失败");
             message.error(errorMessage);
             if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
         }

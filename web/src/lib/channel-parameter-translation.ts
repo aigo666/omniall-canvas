@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 export type ChannelTranslation = { channelId: string; parameterTranslation: string };
 export type TranslationVariable = readonly [label: string, name: string, type: string, description: string];
 
@@ -74,7 +75,7 @@ export const translationConfigItems: readonly (readonly [label: string, code: st
 export const translationRuleHint = "写成一份 JavaScript 对象，用 models 按真实模型名分别配置请求方法、url、headers、body。面板变量直接引用，固定值直接填写，接口字段按文档组织。";
 export const translationResultHint = "用 result 提取图片、视频或音频结果；异步接口在 poll 中填写任务 ID、查询请求和状态，由系统查询并取得最终结果。";
 export const translationTemplate = (model = "模型名称") =>
-    `{\n  models: {\n    ${JSON.stringify(model || "模型名称")}: {\n      POST: {\n        url: "/generate",\n        headers: { Authorization: "Bearer {channelKey}" },\n        body: { model, prompt },\n        format: "json",\n        responseType: "json"\n      },\n      result: "data.images"\n    }\n  }\n}`;
+    `{\n  models: {\n    ${JSON.stringify(model || t("模型名称"))}: {\n      POST: {\n        url: "/generate",\n        headers: { Authorization: "Bearer {channelKey}" },\n        body: { model, prompt },\n        format: "json",\n        responseType: "json"\n      },\n      result: "data.images"\n    }\n  }\n}`;
 
 export function translationAuthoringPrompt(models: string[] = [], baseUrl = "") {
     const groupNames: Record<string, string> = { common: "通用", image: "图片", video: "视频", audio: "音频" };
@@ -82,8 +83,8 @@ export function translationAuthoringPrompt(models: string[] = [], baseUrl = "") 
         items.map(([label, name, type, description]) => [label, name, type, `${groupNames[group]}：${description}`] as const),
     );
     return [
-        `请为 Infinite Canvas 编写一份渠道自定传参转译配置，统一支持图片、视频、音频，按 models 区分真实模型名称。当前渠道已选模型：${models.length ? models.join("、") : "按渠道模型列表填写"}。`,
-        `当前渠道 Base URL：${baseUrl || "未填写，请先确认渠道地址"}。`,
+        `请为 Infinite Canvas 编写一份渠道自定传参转译配置，统一支持图片、视频、音频，按 models 区分真实模型名称。当前渠道已选模型：${models.length ? models.join("、") : t("按渠道模型列表填写")}。`,
+        `当前渠道 Base URL：${baseUrl || t("未填写，请先确认渠道地址")}。`,
         translationRuleHint,
         "只输出完整 JavaScript 对象表达式，不用 Markdown 代码围栏、import、async function、request、return 或手写轮询循环。",
         "",
@@ -136,37 +137,37 @@ export async function translationPrograms(source: string): Promise<Record<string
             if (node.type.isError) invalid = true;
         },
     });
-    if (invalid) throw new Error("配置语法不正确，请检查括号和字段");
+    if (invalid) throw new Error(t("配置语法不正确，请检查括号和字段"));
     const root = tree.topNode.firstChild?.firstChild?.getChild("ObjectExpression");
-    if (!root) throw new Error("渠道配置必须是一份对象：{ models: { ... } }");
+    if (!root) throw new Error(t("渠道配置必须是一份对象：{ models: { ... } }"));
     const key = (node: typeof tree.topNode) => {
         const name = node.firstChild;
-        if (!name || !["PropertyDefinition", "String"].includes(name.name)) throw new Error("配置字段和模型名称必须使用静态名称");
+        if (!name || !["PropertyDefinition", "String"].includes(name.name)) throw new Error(t("配置字段和模型名称必须使用静态名称"));
         const value = text.slice(name.from, name.to);
-        if (node.getChild("ParamList") || !node.getChild(":")) throw new Error("配置字段必须使用字段名和值");
+        if (node.getChild("ParamList") || !node.getChild(":")) throw new Error(t("配置字段必须使用字段名和值"));
         return name.name === "String" ? String(new Function(`return (${value});`)()) : value;
     };
     const fields = root.getChildren("Property");
-    if (root.getChildren("Spread").length || fields.some((field) => !["models", "headers", "poll"].includes(key(field)))) throw new Error("渠道顶层只支持 models、headers、poll");
-    if (new Set(fields.map(key)).size !== fields.length) throw new Error("渠道顶层字段不能重复");
+    if (root.getChildren("Spread").length || fields.some((field) => !["models", "headers", "poll"].includes(key(field)))) throw new Error(t("渠道顶层只支持 models、headers、poll"));
+    if (new Set(fields.map(key)).size !== fields.length) throw new Error(t("渠道顶层字段不能重复"));
     const validatePoll = (field?: typeof tree.topNode) => {
         if (!field) return;
         const object = field.getChild("ObjectExpression");
         const value = field.lastChild;
         if (!object) {
-            if (!value || text.slice(value.from, value.to) !== "false") throw new Error("poll 必须是查询配置对象或 false");
+            if (!value || text.slice(value.from, value.to) !== "false") throw new Error(t("poll 必须是查询配置对象或 false"));
             return;
         }
         const properties = object.getChildren("Property");
-        if (object.getChildren("Spread").length || new Set(properties.map(key)).size !== properties.length) throw new Error("查询配置必须使用不重复的静态字段名");
+        if (object.getChildren("Spread").length || new Set(properties.map(key)).size !== properties.length) throw new Error(t("查询配置必须使用不重复的静态字段名"));
     };
     validatePoll(fields.find((field) => key(field) === "poll"));
     const models = fields.find((field) => key(field) === "models")?.getChild("ObjectExpression");
-    if (!models || models.getChildren("Spread").length) throw new Error("请在 models 中逐个填写真实模型名称和配置");
+    if (!models || models.getChildren("Spread").length) throw new Error(t("请在 models 中逐个填写真实模型名称和配置"));
     const entries = models.getChildren("Property").map((field) => {
         const name = key(field);
         const rule = field.getChild("ObjectExpression");
-        if (!name.trim() || !rule) throw new Error("每个模型必须有明确名称和配置对象");
+        if (!name.trim() || !rule) throw new Error(t("每个模型必须有明确名称和配置对象"));
         const requests = rule.getChildren("Property").filter((item) => translationMethods.includes(key(item) as (typeof translationMethods)[number]));
         if (rule.getChildren("Property").length && requests.length !== 1) throw new Error(`模型 ${name} 必须填写且仅填写一种请求方法`);
         if (rule.getChildren("Spread").length) throw new Error(`模型 ${name} 的请求方法必须明确填写`);
@@ -175,7 +176,7 @@ export async function translationPrograms(source: string): Promise<Record<string
         validatePoll(rule.getChildren("Property").find((field) => key(field) === "poll"));
         return { name, configured: requests.length === 1, rule: text.slice(rule.from, rule.to) };
     });
-    if (new Set(entries.map((item) => item.name)).size !== entries.length) throw new Error("模型名称不能重复");
+    if (new Set(entries.map((item) => item.name)).size !== entries.length) throw new Error(t("模型名称不能重复"));
     const fragment = (name: string, fallback: string) => {
         const field = fields.find((item) => key(item) === name);
         const value = field?.lastChild;

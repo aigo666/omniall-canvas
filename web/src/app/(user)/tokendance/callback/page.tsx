@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { App, Button, Result, Spin } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -27,11 +28,11 @@ export default function TokenDanceCallbackPage() {
                 const storageKey = flow ? `tokendance:oauth:${flow}` : "";
                 const raw = storageKey ? sessionStorage.getItem(storageKey) : null;
 
-                if (!code || !flow || !raw) throw new Error("授权信息已失效，请重新登录");
+                if (!code || !flow || !raw) throw new Error(t("授权信息已失效，请重新登录"));
 
                 const state = JSON.parse(raw) as TokenDanceOAuthState;
                 if (!state.verifier || (state.target !== "local" && state.target !== "admin")) {
-                    throw new Error("授权信息不完整，请重新登录");
+                    throw new Error(t("授权信息不完整，请重新登录"));
                 }
 
                 const returnTo = typeof state.returnTo === "string"
@@ -57,14 +58,14 @@ export default function TokenDanceCallbackPage() {
                 };
 
                 if (!response.ok || typeof data.key !== "string" || !data.key.trim()) {
-                    throw new Error(data.message || data.error || "TokenDance 授权失败");
+                    throw new Error(data.message || data.error || t("TokenDance 授权失败"));
                 }
 
                 const key = data.key.trim();
 
                 if (state.target === "admin") {
                     if (!state.draft || typeof state.draft !== "object") {
-                        throw new Error("后台渠道信息不完整，请重新登录");
+                        throw new Error(t("后台渠道信息不完整，请重新登录"));
                     }
 
                     sessionStorage.setItem(`tokendance:oauth-result:${flow}`, JSON.stringify({
@@ -80,14 +81,14 @@ export default function TokenDanceCallbackPage() {
                     return;
                 }
 
-                if (!state.channelId) throw new Error("对应的 TokenDance 渠道不存在");
+                if (!state.channelId) throw new Error(t("对应的 TokenDance 渠道不存在"));
 
                 const store = useConfigStore.getState();
                 const channels = normalizeLocalChannels(store.config);
                 const target = channels.find((channel) =>
                     channel.id === state.channelId && channel.protocol === "tokendance",
                 );
-                if (!target) throw new Error("对应的 TokenDance 渠道不存在");
+                if (!target) throw new Error(t("对应的 TokenDance 渠道不存在"));
 
                 const nextChannels = channels.map((channel) =>
                     channel.id === state.channelId ? { ...channel, apiKey: key } : channel,
@@ -102,7 +103,7 @@ export default function TokenDanceCallbackPage() {
                 if (accountToken) {
                     const remote = await fetchUserConfig(accountToken);
                     if (useUserStore.getState().token !== accountToken) {
-                        throw new Error("登录状态已变化，请重新登录");
+                        throw new Error(t("登录状态已变化，请重新登录"));
                     }
                     await syncUserModelConfig(accountToken, nextConfig, remote.modelConfig?.workflowChannels);
                 }
@@ -111,11 +112,11 @@ export default function TokenDanceCallbackPage() {
                 if (channels[0]?.id === state.channelId) store.updateConfig("apiKey", key);
 
                 sessionStorage.removeItem(storageKey);
-                message.success("TokenDance 登录成功，API Key 已填入");
+                message.success(t("TokenDance 登录成功，API Key 已填入"));
                 store.openConfigDialog(false);
                 router.replace(safeReturnTo);
             } catch (reason) {
-                setError(reason instanceof Error ? reason.message : "TokenDance 授权失败");
+                setError(reason instanceof Error ? reason.message : t("TokenDance 授权失败"));
             }
         })();
     }, [message, router]);
@@ -125,12 +126,12 @@ export default function TokenDanceCallbackPage() {
             {error ? (
                 <Result
                     status="error"
-                    title="TokenDance 授权失败"
+                    title={t("TokenDance 授权失败")}
                     subTitle={error}
-                    extra={<Button href="/">返回首页</Button>}
+                    extra={<Button href="/">{t("返回首页")}</Button>}
                 />
             ) : (
-                <Spin size="large" tip="正在完成 TokenDance 授权……" />
+                <Spin size="large" tip={t("正在完成 TokenDance 授权……")} />
             )}
         </main>
     );

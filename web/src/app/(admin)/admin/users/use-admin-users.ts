@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
@@ -29,32 +30,32 @@ export function useAdminUsers() {
         mutationFn: (user: Partial<AdminUser> & { password?: string }) => saveAdminUser(token, user),
         onSuccess: async (_, user) => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-            message.success(user.id ? "用户已保存" : "用户已新增");
+            message.success(user.id ? t("用户已保存") : t("用户已新增"));
         },
-        onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
+        onError: (error) => message.error(error instanceof Error ? error.message : t("保存失败")),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminUser(token, id),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-            message.success("用户已删除");
+            message.success(t("用户已删除"));
         },
-        onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
+        onError: (error) => message.error(error instanceof Error ? error.message : t("删除失败")),
     });
 
     const creditMutation = useMutation({
         mutationFn: ({ id, credits }: { id: string; credits: number }) => adjustAdminUserCredits(token, id, credits),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-            message.success("算力点已调整");
+            message.success(t("算力点已调整"));
         },
-        onError: (error) => message.error(error instanceof Error ? error.message : "调整失败"),
+        onError: (error) => message.error(error instanceof Error ? error.message : t("调整失败")),
     });
 
     useEffect(() => {
         if (query.isError) {
-            const errorMessage = query.error instanceof Error ? query.error.message : "读取用户失败";
+            const errorMessage = query.error instanceof Error ? query.error.message : t("读取用户失败");
             message.error(errorMessage);
             if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
         }

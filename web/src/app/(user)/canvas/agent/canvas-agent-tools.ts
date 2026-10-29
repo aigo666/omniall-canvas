@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 
 import type { CanvasAgentPhase } from "../types";
 
+import { t } from "@/i18n";
 export const CANVAS_AGENT_ACTION_NAMES = [
     "get_canvas_summary",
     "get_selected_nodes",
@@ -180,15 +181,15 @@ export const CANVAS_AGENT_TOOLS: CanvasAgentToolDefinition[] = [
 ];
 
 export function normalizeCanvasAgentAction(name: unknown, args: unknown, id = nanoid()): CanvasAgentAction {
-    if (typeof name !== "string" || !ACTION_NAME_SET.has(name)) throw new Error("模型返回了不允许的工具");
-    if (args !== undefined && !isRecord(args)) throw new Error(name + " 的 arguments 必须是对象");
+    if (typeof name !== "string" || !ACTION_NAME_SET.has(name)) throw new Error(t("模型返回了不允许的工具"));
+    if (args !== undefined && !isRecord(args)) throw new Error(name + t(" 的 arguments 必须是对象"));
     const input = isRecord(args) ? args : {};
     const definition = canvasAgentToolDefinition(name);
     const { properties, required = [] } = definition.function.parameters;
     const unknownKeys = Object.keys(input).filter((key) => !Object.prototype.hasOwnProperty.call(properties, key));
-    if (unknownKeys.length) throw new Error(name + " 不支持参数：" + unknownKeys.join("、"));
+    if (unknownKeys.length) throw new Error(name + t(" 不支持参数：") + unknownKeys.join("、"));
     const missingKeys = required.filter((key) => input[key] === undefined);
-    if (missingKeys.length) throw new Error(name + " 的 arguments 缺少必填参数：" + missingKeys.join("、"));
+    if (missingKeys.length) throw new Error(name + t(" 的 arguments 缺少必填参数：") + missingKeys.join("、"));
     const actionName = name as CanvasAgentActionName;
     let normalized: Record<string, unknown> = {};
 
@@ -199,7 +200,7 @@ export function normalizeCanvasAgentAction(name: unknown, args: unknown, id = na
             break;
         case "query_canvas_nodes": {
             const nodeType = optionalString(input.type);
-            if (nodeType && !NODE_TYPES.includes(nodeType)) throw new Error("无效的节点类型");
+            if (nodeType && !NODE_TYPES.includes(nodeType)) throw new Error(t("无效的节点类型"));
             normalized = {
                 ...(optionalString(input.nodeId) ? { nodeId: optionalString(input.nodeId) } : {}),
                 ...(optionalString(input.keyword) ? { keyword: optionalString(input.keyword) } : {}),
@@ -251,14 +252,14 @@ export function normalizeCanvasAgentAction(name: unknown, args: unknown, id = na
                 ...(optionalString(input.title) ? { title: optionalString(input.title) } : {}),
                 ...(optionalString(input.content) ? { content: optionalString(input.content) } : {}),
             };
-            if (!normalized.title && !normalized.content) throw new Error("update_text_node 缺少 title 或 content");
+            if (!normalized.title && !normalized.content) throw new Error(t("update_text_node 缺少 title 或 content"));
             break;
         case "update_node":
             normalized = { nodeId: requiredString(input.nodeId, "nodeId"), title: requiredString(input.title, "title") };
             break;
         case "set_agent_state": {
             const phase = requiredString(input.phase, "phase") as CanvasAgentPhase;
-            if (!PHASES.includes(phase)) throw new Error("无效的 Agent 创作阶段");
+            if (!PHASES.includes(phase)) throw new Error(t("无效的 Agent 创作阶段"));
             const targetDurationSeconds = positiveNumber(input.targetDurationSeconds);
             normalized = {
                 phase,
@@ -272,7 +273,7 @@ export function normalizeCanvasAgentAction(name: unknown, args: unknown, id = na
         }
         case "create_group": {
             const nodeIds = stringArray(input.nodeIds);
-            if (nodeIds.length < 2) throw new Error("create_group 至少需要两个节点");
+            if (nodeIds.length < 2) throw new Error(t("create_group 至少需要两个节点"));
             normalized = { nodeIds, ...(optionalString(input.title) ? { title: optionalString(input.title) } : {}) };
             break;
         }
@@ -289,14 +290,14 @@ export function normalizeCanvasAgentAction(name: unknown, args: unknown, id = na
                 ...(optionalString(input.size) ? { size: optionalString(input.size) } : {}),
                 ...(boundedInteger(input.count, 1, 15) ? { count: boundedInteger(input.count, 1, 15) } : {}),
             };
-            if (actionName === "edit_image" && sourceNodeIds && !sourceNodeIds.length) throw new Error("edit_image 缺少图片来源节点");
+            if (actionName === "edit_image" && sourceNodeIds && !sourceNodeIds.length) throw new Error(t("edit_image 缺少图片来源节点"));
             break;
         }
         case "generate_video": {
             const sourceNodeIds = optionalStringArray(input.sourceNodeIds, "sourceNodeIds");
             const seconds = boundedInteger(input.seconds, -1, 30);
             if (input.model !== undefined) optionalString(input.model);
-            if (input.generateAudio !== undefined && typeof input.generateAudio !== "boolean") throw new Error("generateAudio 必须是布尔值");
+            if (input.generateAudio !== undefined && typeof input.generateAudio !== "boolean") throw new Error(t("generateAudio 必须是布尔值"));
             normalized = {
                 prompt: requiredString(input.prompt, "prompt"),
                 ...(sourceNodeIds ? { sourceNodeIds } : {}),
@@ -332,35 +333,35 @@ export async function parseCanvasAgentJson(content: string, { allowRepair = fals
         try {
             payload = JSON.parse(json);
         } catch {
-            if (!allowRepair) throw new Error("工具 JSON 不是合法 JSON");
+            if (!allowRepair) throw new Error(t("工具 JSON 不是合法 JSON"));
             const repairSource = json || stripJsonFence(content);
             const sourceStructure = inspectJsonStructure(repairSource);
-            if (!sourceStructure.complete) throw new Error("JSON 输出被截断，本批操作未执行");
+            if (!sourceStructure.complete) throw new Error(t("JSON 输出被截断，本批操作未执行"));
             const { jsonrepair } = await import("jsonrepair");
             const repaired = jsonrepair(repairSource);
-            if (inspectJsonStructure(repaired).tokens !== sourceStructure.tokens) throw new Error("JSON 修复改变了操作结构，本批操作未执行");
+            if (inspectJsonStructure(repaired).tokens !== sourceStructure.tokens) throw new Error(t("JSON 修复改变了操作结构，本批操作未执行"));
             payload = JSON.parse(repaired);
         }
         if (!isRecord(payload) || !Object.prototype.hasOwnProperty.call(payload, "actions")) return { parsed: false, actions: [], reply: content.trim() };
         actionPayload = true;
-        if (!Array.isArray(payload.actions)) throw new Error("actions 必须是数组");
-        if (payload.actions.length > 12) throw new Error("单次最多执行 12 个画布操作，请拆分调用");
+        if (!Array.isArray(payload.actions)) throw new Error(t("actions 必须是数组"));
+        if (payload.actions.length > 12) throw new Error(t("单次最多执行 12 个画布操作，请拆分调用"));
         const outerKeys = Object.keys(payload).filter((key) => key !== "actions" && key !== "reply");
-        if (outerKeys.length) throw new Error("JSON 外层不支持字段：" + outerKeys.join("、") + "；工具参数必须放在对应 action 的 arguments 中");
+        if (outerKeys.length) throw new Error(t("JSON 外层不支持字段：") + outerKeys.join("、") + t("；工具参数必须放在对应 action 的 arguments 中"));
         const actions = payload.actions.map((item) => {
-            if (!isRecord(item)) throw new Error("actions 中的每项必须是工具调用对象");
+            if (!isRecord(item)) throw new Error(t("actions 中的每项必须是工具调用对象"));
             const name = item.tool || item.name;
             const misplacedKeys = Object.keys(item).filter((key) => !["id", "tool", "name", "arguments"].includes(key));
             let args = item.arguments;
             if (misplacedKeys.length) {
-                if (typeof name !== "string" || !ACTION_NAME_SET.has(name)) throw new Error("模型返回了不允许的工具");
-                if (args !== undefined && !isRecord(args)) throw new Error(name + " 的 arguments 必须是对象");
+                if (typeof name !== "string" || !ACTION_NAME_SET.has(name)) throw new Error(t("模型返回了不允许的工具"));
+                if (args !== undefined && !isRecord(args)) throw new Error(name + t(" 的 arguments 必须是对象"));
                 const supported = canvasAgentToolDefinition(name).function.parameters.properties;
                 const unsupported = misplacedKeys.filter((key) => !Object.prototype.hasOwnProperty.call(supported, key));
-                if (unsupported.length) throw new Error(name + " 不支持参数：" + unsupported.join("、"));
+                if (unsupported.length) throw new Error(name + t(" 不支持参数：") + unsupported.join("、"));
                 const normalizedArgs = { ...(isRecord(args) ? args : {}) };
                 const conflicts = misplacedKeys.filter((key) => Object.prototype.hasOwnProperty.call(normalizedArgs, key));
-                if (conflicts.length) throw new Error(conflicts.join("、") + " 同时出现在 arguments 内外层");
+                if (conflicts.length) throw new Error(conflicts.join("、") + t(" 同时出现在 arguments 内外层"));
                 misplacedKeys.forEach((key) => { normalizedArgs[key] = item[key]; });
                 args = normalizedArgs;
             }
@@ -368,7 +369,7 @@ export async function parseCanvasAgentJson(content: string, { allowRepair = fals
         });
         return { parsed: true, actions, reply: typeof payload.reply === "string" ? payload.reply.trim() : "" };
     } catch (error) {
-        if (actionPayload) return { parsed: false, actions: [], reply: "", error: error instanceof Error ? error.message : "工具 JSON 格式错误" };
+        if (actionPayload) return { parsed: false, actions: [], reply: "", error: error instanceof Error ? error.message : t("工具 JSON 格式错误") };
         return { parsed: false, actions: [], reply: content.trim() };
     }
 }
@@ -464,24 +465,24 @@ function inspectJsonStructure(value: string) {
 }
 
 function requiredString(value: unknown, key: string) {
-    if (typeof value !== "string") throw new Error(key + " 必须是字符串");
+    if (typeof value !== "string") throw new Error(key + t(" 必须是字符串"));
     const text = value.trim();
-    if (!text) throw new Error(key + " 不能为空");
+    if (!text) throw new Error(key + t(" 不能为空"));
     return text;
 }
 
 function optionalString(value: unknown) {
     if (value === undefined) return "";
-    if (typeof value !== "string") throw new Error("可选文本参数必须是字符串");
+    if (typeof value !== "string") throw new Error(t("可选文本参数必须是字符串"));
     return value.trim();
 }
 
 function stringArray(value: unknown, key = "节点 ID") {
     if (value === undefined) return [];
-    if (!Array.isArray(value)) throw new Error(key + " 必须是字符串数组");
-    if (value.length > 50) throw new Error("节点 ID 数组最多允许 50 项，请拆分调用");
+    if (!Array.isArray(value)) throw new Error(key + t(" 必须是字符串数组"));
+    if (value.length > 50) throw new Error(t("节点 ID 数组最多允许 50 项，请拆分调用"));
     return [...new Set(value.map((item) => {
-        if (typeof item !== "string" || !item.trim()) throw new Error(key + " 必须是字符串数组");
+        if (typeof item !== "string" || !item.trim()) throw new Error(key + t(" 必须是字符串数组"));
         return item.trim();
     }))];
 }
@@ -493,19 +494,19 @@ function optionalStringArray(value: unknown, key: string) {
 
 function positiveNumber(value: unknown) {
     if (value === undefined) return undefined;
-    if (typeof value !== "number" || !Number.isFinite(value) || value < 1) throw new Error("数值必须是大于等于 1 的数字");
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 1) throw new Error(t("数值必须是大于等于 1 的数字"));
     return value;
 }
 
 function boundedInteger(value: unknown, min: number, max: number) {
     const number = boundedNumber(value, min, max);
-    if (number !== undefined && !Number.isInteger(number)) throw new Error("数值必须是整数");
+    if (number !== undefined && !Number.isInteger(number)) throw new Error(t("数值必须是整数"));
     return number;
 }
 
 function boundedNumber(value: unknown, min: number, max: number) {
     if (value === undefined) return undefined;
-    if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new Error("数值必须在 " + min + " 到 " + max + " 之间");
+    if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new Error(t("数值必须在 ") + min + t(" 到 ") + max + t(" 之间"));
     return value;
 }
 

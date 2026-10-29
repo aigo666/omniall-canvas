@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { AppProviders } from "@/components/layout/app-providers";
 import "antd/dist/reset.css";
 import "./globals.css";
 import React from "react";
 
+import { t } from "@/i18n";
 export const metadata: Metadata = {
-    title: "无限画布",
-    description: "一个无限画布创作工具",
+    get title() { return t("无限画布"); },
+    get description() { return t("一个无限画布创作工具"); },
 };
 
 export default function RootLayout({
@@ -17,20 +17,13 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="zh-CN" suppressHydrationWarning className="font-sans">
+        <html lang="zh-CN" suppressHydrationWarning className="font-sans dark" style={{ colorScheme: "dark", backgroundColor: "#0b0b0b" }}>
             <body
                 className="bg-background text-foreground antialiased"
                 style={{
                     fontFamily: '"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif',
                 }}
             >
-                <Script
-                    id="theme-script"
-                    strategy="beforeInteractive"
-                    dangerouslySetInnerHTML={{
-                        __html: `try{var s=JSON.parse(localStorage.getItem("infinite-canvas:theme_store")||"{}");var t=s.state&&s.state.theme==="light"?"light":"dark";document.documentElement.classList.toggle("dark",t==="dark");document.documentElement.style.colorScheme=t}catch(e){}`,
-                    }}
-                />
                 <AntdRegistry>
                     <AppProviders>{children}</AppProviders>
                 </AntdRegistry>

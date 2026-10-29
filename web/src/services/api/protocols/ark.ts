@@ -1,6 +1,7 @@
 import { firstString, normalizeDirectStatus, readDirectError, readPath, readString } from "./shared";
 import type { DirectProtocolAdapter } from "./types";
 
+import { t } from "@/i18n";
 export const arkDirectProtocol: DirectProtocolAdapter = {
     pollPath: (taskId) => `/contents/generations/tasks/${encodeURIComponent(taskId)}`,
     readTaskId: (payload) => readString(readPath(payload, "id")),
@@ -12,7 +13,7 @@ export const arkDirectProtocol: DirectProtocolAdapter = {
         const upstreamError = readDirectError(payload);
         const statusValue = firstString(readPath(payload, "status"), videoUrl ? "completed" : upstreamError ? "failed" : "processing");
         const status = statusValue.toLowerCase() === "expired" ? "failed" : normalizeDirectStatus(statusValue);
-        const error = status === "failed" ? upstreamError || "视频生成失败" : upstreamError;
+        const error = status === "failed" ? upstreamError || t("视频生成失败") : upstreamError;
         return {
             id: firstString(readPath(payload, "id"), pollId),
             task_id: firstString(readPath(payload, "id"), pollId),

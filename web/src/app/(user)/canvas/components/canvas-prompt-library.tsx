@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@/i18n";
 import { useState } from "react";
 import { Button, Tooltip } from "antd";
 import { BookOpen } from "lucide-react";
@@ -14,14 +15,14 @@ export function CanvasPromptLibrary({ onSelect }: { onSelect: (prompt: string) =
 
     return (
         <>
-            <Tooltip title="提示词库">
+            <Tooltip title={t("提示词库")}>
                 <Button
                     type="text"
                     className="!h-8 !w-8 !min-w-8 shrink-0 !rounded-full !bg-transparent !p-0"
                     style={{ color: theme.node.text }}
                     icon={<BookOpen className="size-3.5" />}
                     onClick={() => setOpen(true)}
-                    aria-label="提示词库"
+                    aria-label={t("提示词库")}
                 />
             </Tooltip>
             <PromptSelectDialog open={open} onOpenChange={setOpen} onSelect={onSelect} />

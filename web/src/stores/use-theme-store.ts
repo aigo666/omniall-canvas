@@ -10,10 +10,20 @@ type ThemeStore = {
 
 export const useThemeStore = create<ThemeStore>()(
     persist(
-        (set) => ({
+        () => ({
             theme: "dark",
-            setTheme: (theme) => set({ theme }),
+            // App is dark-only; keep API for existing callers but ignore switches.
+            setTheme: () => undefined,
         }),
-        { name: "infinite-canvas:theme_store" },
+        {
+            name: "infinite-canvas:theme_store",
+            version: 1,
+            migrate: () => ({ theme: "dark" as const }),
+            partialize: () => ({ theme: "dark" as const }),
+            merge: (_persisted, current) => ({
+                ...current,
+                theme: "dark",
+            }),
+        },
     ),
 );

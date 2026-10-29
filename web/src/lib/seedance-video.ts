@@ -2,6 +2,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
+import { t } from "@/i18n";
 export const SEEDANCE_REFERENCE_LIMITS = {
     images: 9,
     videos: 3,
@@ -141,7 +142,7 @@ export function seedancePixelLabel(resolution: string, ratio: string) {
     const resolutionKey = resolution.trim().toLowerCase();
     const normalizedResolution = (resolutionKey in seedancePixels ? resolutionKey : normalizeSeedanceResolution(resolution)) as keyof typeof seedancePixels;
     const normalizedRatio = normalizeSeedanceRatio(ratio) as keyof (typeof seedancePixels)[typeof normalizedResolution] | "adaptive";
-    if (normalizedRatio === "adaptive") return "自动匹配";
+    if (normalizedRatio === "adaptive") return t("自动匹配");
     return seedancePixels[normalizedResolution][normalizedRatio] || "";
 }
 
@@ -179,11 +180,11 @@ export function seedanceVideoReferenceError(videos: ReferenceVideo[], limits = S
             totalDurationMs += video.durationMs;
         }
         if (video.width && video.height) {
-            if (video.width < 300 || video.width > 6000 || video.height < 300 || video.height > 6000) return `${label} 宽高需要在 300-6000px 之间`;
+            if (video.width < 300 || video.width > 6000 || video.height < 300 || video.height > 6000) return t("{label} 宽高需要在 300-6000px 之间", { label });
             const ratio = video.width / video.height;
-            if (ratio < 0.4 || ratio > 2.5) return `${label} 宽高比需要在 0.4-2.5 之间`;
+            if (ratio < 0.4 || ratio > 2.5) return t("{label} 宽高比需要在 0.4-2.5 之间", { label });
             const pixels = video.width * video.height;
-            if (pixels < 640 * 640 || pixels > 2206 * 946) return `${label} 像素总量不符合 Seedance 要求，请转成 480p/720p/1080p 后再上传`;
+            if (pixels < 640 * 640 || pixels > 2206 * 946) return t("{label} 像素总量不符合 Seedance 要求，请转成 480p/720p/1080p 后再上传", { label });
         }
     }
     if (totalDurationMs > limits.totalDurationMs) return `Seedance 参考视频总时长不能超过 ${limits.totalDurationMs / 1000} 秒`;

@@ -2,6 +2,7 @@ import type { CanvasProject } from "@/app/(user)/canvas/stores/use-canvas-store"
 import { apiGet, apiPost } from "@/services/api/request";
 import { useUserStore } from "@/stores/use-user-store";
 
+import { t } from "@/i18n";
 export async function listCanvasProjects(token: string) {
     return apiGet<CanvasProject[]>("/api/v1/canvas/projects", undefined, token);
 }
@@ -30,7 +31,7 @@ export async function syncCanvasProjects(
 
 export async function stopCanvasTask(kind: "image" | "video" | "audio", id: string, workflow: boolean, source: "canvas" | "video-workbench" = "canvas") {
     const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录后再停止云端任务");
+    if (!token) throw new Error(t("请先登录后再停止云端任务"));
     return apiPost<{ stopped: boolean }>("/api/v1/canvas/tasks/stop", { kind, id, workflow, source }, token);
 }
 
