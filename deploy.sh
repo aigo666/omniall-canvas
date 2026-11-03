@@ -9,7 +9,9 @@
 #   DEPLOY_SKIP_DOCKER_CLEAN=1   跳过镜像/缓存清理
 #   DEPLOY_PRUNE_BUILD_ALL=1     清理全部 BuildKit 缓存（默认仅清 24h 前）
 #   DEPLOY_MIN_FREE_GB=8         构建前最低可用磁盘（GB）
-#   DEPLOY_NO_CACHE=1            docker build 不使用缓存（更干净，更慢）
+#   DEPLOY_USE_CACHE=1           允许使用 Docker 构建缓存（默认无缓存，避免首页 CSS 错乱）
+#   DEPLOY_HEALTH_WAIT=90        健康检查最长等待秒数
+#   CF_ZONE_ID / CF_API_TOKEN    若设置，部署后自动 purge Cloudflare 缓存
 #
 # 容器内前端 3000、后端 8080；宿主机端口见 docker-compose.deploy.yml（默认 8866）。
 set -euo pipefail
@@ -102,6 +104,70 @@ ensure_disk_for_build() {
   fi
 }
 
+# 校验首页引用的 CSS 都能 200，避免「能打开但排版全乱」
+verify_frontend_css() {
+  local base="http://127.0.0.1:${HOST_PORT}"
+  log "校验首页静态样式资源（防止 CSS 404 导致排版错乱）..."
+
+  if ! docker exec "$CONTAINER_NAME" sh -c 'ls /app/web/.next/static/chunks/*.css >/dev/null 2>&1'; then
+    fail "容器内缺少 /app/web/.next/static/chunks/*.css。Dockerfile 静态资源打包失败。"
+  fi
+
+  info "容器内 CSS 文件:"
+  docker exec "$CONTAINER_NAME" sh -c 'ls -lh /app/web/.next/static/chunks/*.css' | sed 's/^/  /' || true
+
+  local html
+  html="$(curl -sf "$base/" || true)"
+  if [ -z "$html" ]; then
+    fail "无法读取首页 HTML: $base/"
+  fi
+
+  local css_paths
+  css_paths="$(printf '%s' "$html" | tr '"' '\n' | grep -E '^/_next/static/[^[:space:]]+\.css$' | sort -u || true)"
+  if [ -z "$css_paths" ]; then
+    fail "首页 HTML 未引用任何 /_next/static/*.css，前端构建异常。"
+  fi
+
+  local path code bytes failed=0
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    code="$(curl -sS -o /tmp/omniall-css-check.bin -w '%{http_code}' "$base$path" || echo 000)"
+    bytes="$(wc -c </tmp/omniall-css-check.bin 2>/dev/null | tr -d ' ' || echo 0)"
+    if [ "$code" != "200" ] || [ "${bytes:-0}" -lt 100 ]; then
+      warn "CSS 异常: $path -> HTTP $code, size=${bytes}B"
+      failed=1
+    else
+      info "CSS OK: $path (${bytes}B)"
+    fi
+  done <<< "$css_paths"
+
+  rm -f /tmp/omniall-css-check.bin
+
+  if [ "$failed" -ne 0 ]; then
+    warn "容器内 chunks 目录:"
+    docker exec "$CONTAINER_NAME" sh -c 'ls -la /app/web/.next/static/chunks | head -n 40' || true
+    fail "首页 CSS 校验失败（这会导致排版全乱）。请确认已拉取含 Dockerfile 修复的最新代码后重试 ./deploy.sh"
+  fi
+
+  log "前端 CSS 校验通过"
+}
+
+purge_cloudflare_cache_if_configured() {
+  if [ -z "${CF_ZONE_ID:-}" ] || [ -z "${CF_API_TOKEN:-}" ]; then
+    warn "未设置 CF_ZONE_ID/CF_API_TOKEN，跳过 Cloudflare 缓存清理。若前面有 CDN，请手动 Purge Cache。"
+    return 0
+  fi
+  log "清理 Cloudflare 缓存 (zone: ${CF_ZONE_ID})..."
+  if curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data '{"purge_everything":true}' | grep -q '"success":true'; then
+    log "Cloudflare 缓存已清理"
+  else
+    warn "Cloudflare 缓存清理失败（不影响本机容器，但外网可能仍看到旧页面）"
+  fi
+}
+
 # ── 0. 先拉最新代码，再 exec 用最新 deploy.sh 继续 ──
 if [ "${DEPLOY_POST_SYNC:-}" != "1" ]; then
   if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -170,8 +236,12 @@ cleanup_docker_residuals "构建前"
 ensure_disk_for_build
 
 BUILD_ARGS=( -f "$COMPOSE_FILE" build )
-if [ "${DEPLOY_NO_CACHE:-}" = "1" ]; then
-  warn "DEPLOY_NO_CACHE=1：不使用 Docker 构建缓存"
+# 默认无缓存构建，避免旧 static 层与新 HTML 的 CSS hash 不一致导致首页排版错乱。
+# 若确认无此问题，可 export DEPLOY_USE_CACHE=1 加速构建。
+if [ "${DEPLOY_USE_CACHE:-}" = "1" ]; then
+  warn "DEPLOY_USE_CACHE=1：使用 Docker 构建缓存"
+else
+  warn "默认无缓存构建（修复首页 CSS 404 / 排版错乱）；加速可设 DEPLOY_USE_CACHE=1"
   BUILD_ARGS+=(--no-cache)
 fi
 
@@ -196,6 +266,10 @@ until curl -sf "http://127.0.0.1:${HOST_PORT}/" >/dev/null 2>&1 \
 done
 echo ""
 
+# ── 4.5 前端 CSS 校验（首页排版问题）─────────────
+verify_frontend_css
+purge_cloudflare_cache_if_configured
+
 # ── 5. 部署后清理悬空镜像与过期构建缓存 ───────────
 cleanup_docker_residuals "部署后"
 
@@ -204,4 +278,5 @@ log "✅ 部署完成！"
 log "  访问地址: http://<服务器IP>:${HOST_PORT}"
 log "  当前提交: $(git rev-parse --short HEAD)"
 log "  查看日志: ${COMPOSE[*]} -f ${COMPOSE_FILE} logs -f"
-warn "Docker 清理：默认回收悬空镜像 + 24h 前构建缓存；跳过清理 export DEPLOY_SKIP_DOCKER_CLEAN=1；全量清缓存 export DEPLOY_PRUNE_BUILD_ALL=1；强制无缓存构建 export DEPLOY_NO_CACHE=1"
+warn "若域名经 Cloudflare，请确认已 purge；或设置 CF_ZONE_ID + CF_API_TOKEN 自动清理。"
+warn "Docker：默认无缓存构建 + 清理悬空镜像；DEPLOY_USE_CACHE=1 可加速；DEPLOY_SKIP_DOCKER_CLEAN=1 跳过清理。"
