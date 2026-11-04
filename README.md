@@ -2,10 +2,14 @@
   <img src="web/public/logo.svg" width="96" alt="OmniAll Canvas logo">
 </p>
 
-<h1 align="center">OmniAll Canvas · 无限画布</h1>
+<p align="center">
+  <strong>English</strong> · <a href="./README.zh-CN.md">中文</a>
+</p>
+
+<h1 align="center">OmniAll Canvas</h1>
 
 <p align="center">
-  <a href="https://omniall.ai"><img src="https://img.shields.io/badge/OmniAll.ai-完美兼容-0ea5e9?style=flat-square" alt="OmniAll.ai"></a>
+  <a href="https://omniall.ai"><img src="https://img.shields.io/badge/OmniAll.ai-compatible-0ea5e9?style=flat-square" alt="OmniAll.ai"></a>
   <a href="VERSION"><img src="https://img.shields.io/badge/version-v0.8.2-2563eb?style=flat-square" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-f97316?style=flat-square" alt="License"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ed?style=flat-square&logo=docker&logoColor=white" alt="Docker ready"></a>
@@ -14,85 +18,91 @@
 </p>
 
 <p align="center">
-  <strong>完美兼容适配 <a href="https://omniall.ai">OmniAll.ai</a></strong><br>
-  <sub>开源 AI 创作工作台 · 无限画布 · Agent · 导演台 · 多模态生成</sub>
+  <strong>Built for <a href="https://omniall.ai">OmniAll.ai</a></strong><br>
+  <sub>Open-source AI creation studio · Infinite canvas · Agent · Director stage · Multimodal generation</sub>
 </p>
 
-OmniAll Canvas（无限画布）是面向图片、视频、音频的全能创作开源工作台。它把画布编排、AI 生图 / 生视频 / 音频、参考图编辑、对话助手、提示词库和素材沉淀放在同一界面，适合连续探索与迭代视觉方案。
+<p align="center">
+  <a href="https://agent.omniall.ai">Live demo</a> ·
+  <a href="https://github.com/aigo666/omniall-canvas">GitHub</a> ·
+  <a href="https://omniall.ai">OmniAll.ai</a>
+</p>
 
-本项目已针对 **[OmniAll.ai](https://omniall.ai)** 做完整兼容适配：使用 OmniAll 的 OpenAI 兼容 API（`Base URL` + `API Key`）即可调用平台上的文生图、图生图、视频生成与对话模型，开箱即用。
+OmniAll Canvas is an open-source all-in-one creation studio for images, video, and audio. It combines canvas orchestration, AI image/video/audio generation, reference editing, chat assistants, prompt libraries, and asset management in one UI — made for continuous visual exploration and iteration.
 
-## 与 OmniAll.ai 的兼容说明
+The project is fully adapted for **[OmniAll.ai](https://omniall.ai)**: use OmniAll’s OpenAI-compatible API (`Base URL` + `API Key`) to call text-to-image, image-to-image, video, and chat models out of the box.
 
-- **接口协议**：标准 OpenAI 兼容请求格式，直接对接 OmniAll.ai 网关。
-- **模型能力**：文生图、图生图、参考图编辑、文本对话、音频与视频生成，均可使用 OmniAll 侧已开通模型。
-- **配置方式**：在系统 / 画布配置中填写 OmniAll 的 `Base URL` 与 `API Key` 即可开始创作。
-- **调用扩展**：若个别模型路径与默认形态不同，可在画布内自定义生图 / 视频调用方式，灵活适配 OmniAll 各通道。
+## OmniAll.ai compatibility
 
-## 核心功能
+- **Protocol**: Standard OpenAI-compatible requests against the OmniAll.ai gateway.
+- **Models**: Text-to-image, image-to-image, reference editing, chat, audio, and video — whatever you have enabled on OmniAll.
+- **Setup**: Enter OmniAll `Base URL` and `API Key` in system / canvas settings.
+- **Flexibility**: Custom image/video call shapes are supported when a model path differs from the defaults.
 
-- Agent：围绕选中节点和上游节点分析、规划并生成图片或视频，支持选择 Skill 指导当前创作任务，并将结果插回画布
-- 全景图：支持文字生成、参考图生成和本地 2:1 全景图导入，可作为导演台的场景环境背景
-- 导演台：在独立 3D 场景中布置角色、模型、全景环境和机位，支持镜头管理、截图，并将机位画面自动发送为连线图片节点
-- 摄像机控制：图片、视频和生成配置节点支持独立设置相机、镜头、焦距和光圈，将镜头参数自动写入生成提示词，并随节点保存和复制
-- 无限画布：多画布项目、节点拖拽缩放、连线、小地图、撤销重做、导入导出
-- AI 创作：支持 OpenAI 兼容接口的 Images API、Responses API、图生图、参考图编辑、流式接收、Base64 图片返回（推荐对接 OmniAll.ai）
-- 生图工作台：支持侧边/悬浮底部工作台、多任务并发、历史结果合并展示、分类管理、失败详情、参考图缩略图、图片体积展示和“我的素材”复用
-- 创作工作流：支持公开/个人模板、变量表单、AI 创建工作流、单图/多图系列工作流、参考图输入和结果自动进入生图历史
-- 提示词与素材：提示词库、服务器素材库和“我的素材”可在生图、画布 AI 和工作流中复用
+## Features
 
-完整功能说明见 [docs/features.md](docs/overview/features.md)
+- **Agent**: Analyze selected nodes and upstream context, plan and generate images or video, apply Skills, and insert results back onto the canvas
+- **Panorama**: Text-to-panorama, reference-based generation, and local 2:1 panorama import as Director Stage environments
+- **Director Stage**: Place characters, models, panoramas, and cameras in a 3D scene; manage shots, capture frames, and send camera views as linked image nodes
+- **Camera controls**: Set camera, lens, focal length, and aperture on image/video/config nodes; parameters are written into prompts and persist with copy/save
+- **Infinite canvas**: Multi-project boards, drag/zoom, links, minimap, undo/redo, import/export
+- **AI creation**: OpenAI-compatible Images API & Responses API, image-to-image, reference edits, streaming, Base64 outputs (OmniAll.ai recommended)
+- **Image workbench**: Side/floating dock, concurrent tasks, merged history, categories, failure details, reference thumbnails, size display, and “My assets” reuse
+- **Creative workflows**: Public/personal templates, variable forms, AI-created workflows, single/multi-image series, reference inputs, results into generation history
+- **Prompts & assets**: Prompt library, server asset library, and “My assets” reusable across generation, canvas AI, and workflows
 
-## 技术栈
+Full feature list: [docs/features.md](docs/overview/features.md)
 
-- 前端：Next.js、React、TypeScript、Tailwind CSS、Ant Design、Zustand、TanStack Query
-- 后端：Go、Gin、GORM
-- 存储：SQLite、本地 IndexedDB、S3 兼容对象存储、Cloudflare R2
-- 部署：Docker
+## Tech stack
 
-## 快速开始
+- Frontend: Next.js, React, TypeScript, Tailwind CSS, Ant Design, Zustand, TanStack Query
+- Backend: Go, Gin, GORM
+- Storage: SQLite, IndexedDB, S3-compatible object storage, Cloudflare R2
+- Deploy: Docker
 
-### 推荐：对接 OmniAll.ai
+## Quick start
 
-1. 在 [OmniAll.ai](https://omniall.ai) 获取 API Key
-2. 按下方方式启动 OmniAll Canvas
-3. 在系统配置中填写 OmniAll 的 `Base URL` 与 `API Key`
-4. 选择已开通模型，即可在画布中生图 / 生视频 / 对话
+### Recommended: OmniAll.ai
 
-### Docker 部署
+1. Get an API Key from [OmniAll.ai](https://omniall.ai)
+2. Start OmniAll Canvas with one of the methods below
+3. Set OmniAll `Base URL` and `API Key` in settings
+4. Pick enabled models and create images / video / chat on the canvas
+
+### Docker
 
 ```bash
 git clone https://github.com/aigo666/omniall-canvas.git
 cd omniall-canvas
 cp .env.example .env
-# 按需修改默认账号密码等信息
+# adjust default credentials as needed
 docker compose up -d --build
 ```
 
-### 本地开发
+### Local development
 
 ```bash
 cp .env.example .env
 go run .
 
-# 另开一个终端
+# another terminal
 cd web
 bun install
 bun run dev
 ```
 
-### 本地源码构建运行
+### Local source build with Docker
 
 ```bash
 cp .env.example .env
 docker compose -f docker-compose.local.yml up -d --build
 ```
 
-运行后默认端口 `3000`，访问 `http://localhost:3000`。
+Default port is `3000` → `http://localhost:3000`.
 
-如需管理提示词，可前往：`http://localhost:3000/admin/prompts`
+Prompt admin: `http://localhost:3000/admin/prompts`
 
-## 效果展示
+## Gallery
 
 <table width="100%">
   <tr>
@@ -121,17 +131,17 @@ docker compose -f docker-compose.local.yml up -d --build
   </tr>
 </table>
 
-## 文档
+## Docs
 
-- [功能介绍](docs/overview/features.md)
-- [部署说明](docs/overview/docker.md)
-- [画布节点操作手册](docs/canvas/canvas-node-manual.md)
-- [画布快捷键](docs/canvas/canvas-shortcuts.md)
-- [待办事项](docs/progress/todo.md)
-- [后端数据库说明](docs/backend/backend-database.md)
-- [系统配置数据结构](docs/backend/system-settings.md)
-- [接口响应约定](docs/backend/api-response.md)
+- [Features](docs/overview/features.md)
+- [Docker deploy](docs/overview/docker.md)
+- [Canvas node manual](docs/canvas/canvas-node-manual.md)
+- [Canvas shortcuts](docs/canvas/canvas-shortcuts.md)
+- [Todo](docs/progress/todo.md)
+- [Backend database](docs/backend/backend-database.md)
+- [System settings schema](docs/backend/system-settings.md)
+- [API response conventions](docs/backend/api-response.md)
 
-## 开源协议
+## License
 
-本项目使用 GNU Affero General Public License v3.0，见 [LICENSE](LICENSE)。
+GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
