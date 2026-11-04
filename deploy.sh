@@ -12,8 +12,11 @@
 #   DEPLOY_USE_CACHE=1           允许使用 Docker 构建缓存（默认无缓存，避免首页 CSS 错乱）
 #   DEPLOY_HEALTH_WAIT=90        健康检查最长等待秒数
 #   CF_ZONE_ID / CF_API_TOKEN    若设置，部署后自动 purge Cloudflare 缓存
+#   AGENT_PUBLIC_URL=https://agent.omniall.ai
+#       部署后额外校验公网 HTML/CSS 是否一致（能发现 nginx/CDN 旧缓存）
 #
 # 容器内前端 3000、后端 8080；宿主机端口见 docker-compose.deploy.yml（默认 8866）。
+# nginx 反代请参考 deploy/nginx-agent.conf.example（HTML 禁止 proxy_cache）。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -104,6 +107,51 @@ ensure_disk_for_build() {
   fi
 }
 
+# 校验某 base 上首页引用的 CSS 都能 200，且至少有一个主样式体积正常。
+verify_css_against_base() {
+  local base="$1"
+  local label="$2"
+  local html css_paths path code bytes failed=0 max_bytes=0
+
+  html="$(curl -sf -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' "$base/" || true)"
+  if [ -z "$html" ]; then
+    warn "[$label] 无法读取首页 HTML: $base/"
+    return 1
+  fi
+
+  css_paths="$(printf '%s' "$html" | tr '"' '\n' | grep -E '^/_next/static/[^[:space:]]+\.css$' | sort -u || true)"
+  if [ -z "$css_paths" ]; then
+    warn "[$label] 首页 HTML 未引用任何 /_next/static/*.css"
+    return 1
+  fi
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    code="$(curl -sS -o /tmp/omniall-css-check.bin -w '%{http_code}' -H 'Cache-Control: no-cache' "$base$path" || echo 000)"
+    bytes="$(wc -c </tmp/omniall-css-check.bin 2>/dev/null | tr -d ' ' || echo 0)"
+    if [ "$code" != "200" ] || [ "${bytes:-0}" -lt 100 ]; then
+      warn "[$label] CSS 异常: $path -> HTTP $code, size=${bytes}B"
+      failed=1
+    else
+      info "[$label] CSS OK: $path (${bytes}B)"
+      if [ "${bytes:-0}" -gt "$max_bytes" ]; then
+        max_bytes="$bytes"
+      fi
+    fi
+  done <<< "$css_paths"
+
+  rm -f /tmp/omniall-css-check.bin
+
+  if [ "$failed" -ne 0 ]; then
+    return 1
+  fi
+  if [ "${max_bytes:-0}" -lt 20000 ]; then
+    warn "[$label] 最大 CSS 仅 ${max_bytes}B（<20KB），疑似主样式缺失，首屏会乱"
+    return 1
+  fi
+  return 0
+}
+
 # 校验首页引用的 CSS 都能 200，避免「能打开但排版全乱」
 verify_frontend_css() {
   local base="http://127.0.0.1:${HOST_PORT}"
@@ -116,37 +164,25 @@ verify_frontend_css() {
   info "容器内 CSS 文件:"
   docker exec "$CONTAINER_NAME" sh -c 'ls -lh /app/web/.next/static/chunks/*.css' | sed 's/^/  /' || true
 
-  local html
-  html="$(curl -sf "$base/" || true)"
-  if [ -z "$html" ]; then
-    fail "无法读取首页 HTML: $base/"
-  fi
-
-  local css_paths
-  css_paths="$(printf '%s' "$html" | tr '"' '\n' | grep -E '^/_next/static/[^[:space:]]+\.css$' | sort -u || true)"
-  if [ -z "$css_paths" ]; then
-    fail "首页 HTML 未引用任何 /_next/static/*.css，前端构建异常。"
-  fi
-
-  local path code bytes failed=0
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    code="$(curl -sS -o /tmp/omniall-css-check.bin -w '%{http_code}' "$base$path" || echo 000)"
-    bytes="$(wc -c </tmp/omniall-css-check.bin 2>/dev/null | tr -d ' ' || echo 0)"
-    if [ "$code" != "200" ] || [ "${bytes:-0}" -lt 100 ]; then
-      warn "CSS 异常: $path -> HTTP $code, size=${bytes}B"
-      failed=1
-    else
-      info "CSS OK: $path (${bytes}B)"
-    fi
-  done <<< "$css_paths"
-
-  rm -f /tmp/omniall-css-check.bin
-
-  if [ "$failed" -ne 0 ]; then
+  if ! verify_css_against_base "$base" "local:${HOST_PORT}"; then
     warn "容器内 chunks 目录:"
     docker exec "$CONTAINER_NAME" sh -c 'ls -la /app/web/.next/static/chunks | head -n 40' || true
-    fail "首页 CSS 校验失败（这会导致排版全乱）。请确认已拉取含 Dockerfile 修复的最新代码后重试 ./deploy.sh"
+    fail "本机端口 CSS 校验失败（这会导致排版全乱）。请确认已拉取最新代码后重试 ./deploy.sh"
+  fi
+
+  # 可选：校验公网域名（能抓到「nginx/CDN 缓存旧 HTML」这类本机测不出来的问题）
+  if [ -n "${AGENT_PUBLIC_URL:-}" ]; then
+    local public="${AGENT_PUBLIC_URL%/}"
+    log "校验公网域名 CSS: $public （可用 AGENT_PUBLIC_URL 配置）"
+    if ! verify_css_against_base "$public" "public"; then
+      fail "公网 CSS 校验失败：本机容器正常，但域名仍 404/缺主样式。多半是 nginx/CDN 缓存了旧 HTML。请：
+  1) 参考 deploy/nginx-agent.conf.example 关闭 HTML 的 proxy_cache
+  2) nginx -s reload 并清理 CDN / Cloudflare 缓存
+  3) 再设 AGENT_PUBLIC_URL=$public ./deploy.sh 复检"
+    fi
+    log "公网 CSS 校验通过"
+  else
+    warn "未设置 AGENT_PUBLIC_URL，跳过公网校验。建议：AGENT_PUBLIC_URL=https://agent.omniall.ai ./deploy.sh"
   fi
 
   log "前端 CSS 校验通过"
@@ -279,4 +315,5 @@ log "  访问地址: http://<服务器IP>:${HOST_PORT}"
 log "  当前提交: $(git rev-parse --short HEAD)"
 log "  查看日志: ${COMPOSE[*]} -f ${COMPOSE_FILE} logs -f"
 warn "若域名经 Cloudflare，请确认已 purge；或设置 CF_ZONE_ID + CF_API_TOKEN 自动清理。"
+warn "建议设置 AGENT_PUBLIC_URL=https://agent.omniall.ai 做公网 CSS 复检；nginx 参考 deploy/nginx-agent.conf.example。"
 warn "Docker：默认无缓存构建 + 清理悬空镜像；DEPLOY_USE_CACHE=1 可加速；DEPLOY_SKIP_DOCKER_CLEAN=1 跳过清理。"

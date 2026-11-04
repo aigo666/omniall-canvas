@@ -6,6 +6,12 @@ import "./globals.css";
 import React from "react";
 
 import { t } from "@/i18n";
+
+// 禁止 Full Route Cache / ISR 长缓存 HTML，避免发版后 CDN/nginx 仍吐旧 HTML
+//（旧 CSS hash → 404 → 首屏排版错乱）。
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
     get title() { return t("无限画布"); },
     get description() { return t("一个无限画布创作工具"); },

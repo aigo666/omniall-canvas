@@ -1,0 +1,49 @@
+# OmniAll Canvas（agent.omniall.ai）反代示例
+# 把下面 upstream 指到 docker-compose 映射端口（默认 8866）。
+#
+# 关键：HTML 与文档路径禁止 proxy_cache，否则发版后仍吐旧 HTML，
+# 引用已不存在的 /_next/static/*.css → 404 → 首屏排版全乱。
+# 带 hash 的 /_next/static/ 可以长期缓存。
+
+upstream omniall_canvas {
+    server 127.0.0.1:8866;
+    keepalive 32;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name agent.omniall.ai;
+
+    # ssl_certificate     /path/to/fullchain.pem;
+    # ssl_certificate_key /path/to/privkey.pem;
+
+    # 带 hash 的静态资源：可缓存
+    location /_next/static/ {
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://omniall_canvas;
+        proxy_cache off;
+        # 若前面还有 CDN，源站已对 hash 文件设置 immutable；这里不要二次改写 HTML 缓存策略
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    # 页面 / API：禁止缓存（务必）
+    location / {
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_pass http://omniall_canvas;
+
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header Cache-Control "private, no-cache, no-store, max-age=0, must-revalidate" always;
+        add_header CDN-Cache-Control "no-store" always;
+    }
+}

@@ -21,6 +21,13 @@ export default function nextConfig(phase: string): NextConfig {
         typescript: {
             ignoreBuildErrors: true,
         },
+        // 缩短客户端 Router Cache，降低发版后短时间仍用旧壳的概率。
+        experimental: {
+            staleTimes: {
+                dynamic: 0,
+                static: 0,
+            },
+        },
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),
@@ -39,11 +46,36 @@ export default function nextConfig(phase: string): NextConfig {
                     ],
                 },
                 {
+                    source: "/",
+                    headers: [
+                        {
+                            key: "Cache-Control",
+                            value: "private, no-cache, no-store, max-age=0, must-revalidate",
+                        },
+                        {
+                            key: "CDN-Cache-Control",
+                            value: "no-store",
+                        },
+                        {
+                            key: "Cloudflare-CDN-Cache-Control",
+                            value: "no-store",
+                        },
+                    ],
+                },
+                {
                     source: "/:path*",
                     headers: [
                         {
                             key: "Cache-Control",
                             value: "private, no-cache, no-store, max-age=0, must-revalidate",
+                        },
+                        {
+                            key: "CDN-Cache-Control",
+                            value: "no-store",
+                        },
+                        {
+                            key: "Cloudflare-CDN-Cache-Control",
+                            value: "no-store",
                         },
                     ],
                 },
