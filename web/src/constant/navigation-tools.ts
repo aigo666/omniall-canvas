@@ -1,4 +1,4 @@
-import { FileText, FolderOpen, House, ImagePlus, Images, LayoutGrid, Music2, Video, type LucideIcon } from "lucide-react";
+import { FileText, FolderOpen, House, ImagePlus, Images, LayoutGrid, Music2, Sparkles, Video, type LucideIcon } from "lucide-react";
 
 export const workbenchTools = [
     {
@@ -31,6 +31,7 @@ export type NavigationItem = {
 export const primaryNavigation: NavigationItem[] = [
     { key: "home", href: "/", label: "首页", icon: House, match: [""] },
     { key: "workbench", href: "/image", label: "工作台", icon: LayoutGrid, match: workbenchTools.map((tool) => tool.slug) },
+    { key: "redraw", href: "/redraw", label: "顶级重绘", icon: Sparkles, match: ["redraw"] },
     { key: "prompts", href: "/prompts", label: "提示词库", icon: FileText, match: ["prompts"] },
     { key: "assets", href: "/assets", label: "我的素材", icon: Images, match: ["assets"] },
 ];
